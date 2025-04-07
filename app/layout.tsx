@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Instrument_Sans } from "next/font/google";
 import "./globals.css";
+import SideNav from "./components/SideNav";
 
-const inter = Inter({ subsets: ["latin"] });
+const instrumentSans = Instrument_Sans({
+  subsets: ["latin"],
+  // You can specify weight if needed
+  // weight: ['400', '500', '700'],
+  // You can also specify display style
+  // display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -16,7 +23,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={`${instrumentSans.className}`}>
+        <SideNav/>
+        <div className="ml-[20%]">
+        {children}
+        </div>
+       </body>
     </html>
   );
 }
