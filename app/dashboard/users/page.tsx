@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import Header from "@/app/components/Header";
 import {
   Table,
@@ -47,6 +47,21 @@ export default function UsersPage(): React.ReactElement {
     }
   }, [getUsers, currentPage, itemsPerPage, isSearchActive]);
   
+  // Memoize the search handler
+  const handleSearch = useCallback(async () => {
+    if (query.trim()) {
+      await searchUsers(query);
+      setIsSearchActive(searchResults && searchResults.length > 0);
+    }
+  }, [query, searchUsers, searchResults]);
+  
+  // Memoize the clear handler
+  const handleClear = useCallback(() => {
+    setQuery("");
+    clearSearch();
+    setIsSearchActive(false);
+  }, [clearSearch]);
+  
   // Handle search with debounce
   useEffect(() => {
     // Debounce search function
@@ -68,20 +83,7 @@ export default function UsersPage(): React.ReactElement {
         clearTimeout(searchTimeout.current);
       }
     };
-  }, [query]);
-  
-  const handleSearch = async () => {
-    if (query.trim()) {
-      await searchUsers(query);
-      setIsSearchActive(searchResults && searchResults.length > 0);
-    }
-  };
-
-  const handleClear = () => {
-    setQuery("");
-    clearSearch();
-    setIsSearchActive(false);
-  };
+  }, [query, handleSearch, clearSearch]);
   
   const handleDelete = async (publicId: string): Promise<void> => {
     if (confirm("Are you sure you want to delete this user?")) {
@@ -118,8 +120,6 @@ export default function UsersPage(): React.ReactElement {
     setItemsPerPage(Number(e.target.value));
     setCurrentPage(1); // Reset to first page when changing items per page
   };
-  
-  // This function was removed as we integrated the search directly
   
   return (
     <div className="px-6 ml-[20%]">
@@ -264,7 +264,7 @@ export default function UsersPage(): React.ReactElement {
               ))
             ) : (
               <TableRow>
-                <TableCell  className="text-center py-4">
+                <TableCell className="text-center py-4">
                   {loading ? "Loading users..." : 
                    searching ? "Searching..." : 
                    isSearchActive ? "No matching users found" : "No users found"}

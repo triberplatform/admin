@@ -73,7 +73,7 @@ export default function Home() {
         </div>
         
         <p className="mt-4 text-gray-600">
-          Welcome to your dashboard. Here's an overview of your platform.
+          Welcome to your dashboard. Here&apos;s an overview of your platform.
         </p>
       </div>
       

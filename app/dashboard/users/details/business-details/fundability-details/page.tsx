@@ -31,6 +31,7 @@ interface DocumentPreviewModalProps {
 }
 
 // Modal component for document preview
+// Modal component for document preview
 const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({ 
   isOpen, 
   onClose, 
@@ -40,6 +41,22 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   // Determine content type based on fileType
   const isImage = document.fileType === 'JPG' || document.fileType === 'PNG';
+  const imageLoader = ({src}:any) => {
+    return `${src}`;
+  }
+
+  // Handle file download
+  const handleDownload = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    
+    // Use window.document to explicitly access the DOM Document interface
+    const link = window.document.createElement('a');
+    link.href = document.downloadUrl;
+    link.download = document.title;
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
@@ -60,8 +77,11 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           {isImage ? (
             // Render image
             <div className="flex justify-center">
-              <img 
+              <Image
                 src={document.downloadUrl} 
+                loader={imageLoader}
+                width={1000}
+                height={1000}
                 alt={document.title} 
                 className="max-w-full max-h-[70vh] object-contain" 
               />
@@ -79,13 +99,21 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           <div className="text-sm text-gray-500">
             {document.fileType} · {document.fileSize} · {document.date ? format(new Date(document.date), "dd MMM yyyy") : "No date"}
           </div>
-          <a 
-            href={document.downloadUrl} 
-            download={document.title}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          <Link 
+            href={document.downloadUrl}
+            passHref
+            legacyBehavior
           >
-            Download
-          </a>
+            <a
+              download={document.title}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleDownload}
+            >
+              Download
+            </a>
+          </Link>
         </div>
       </div>
     </div>

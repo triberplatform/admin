@@ -101,10 +101,8 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
   onClose, 
   businessName 
 }) => {
-  if (!isOpen) return null;
-  
-  // Auto close after 3 seconds
-  React.useEffect(() => {
+  // Fix: Move useEffect outside of conditional rendering
+  useEffect(() => {
     if (isOpen) {
       const timer = setTimeout(() => {
         onClose();
@@ -113,6 +111,8 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
       return () => clearTimeout(timer);
     }
   }, [isOpen, onClose]);
+  
+  if (!isOpen) return null;
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

@@ -168,6 +168,10 @@ const UserPage: React.FC = () => {
   // Render logo component
   const BusinessLogo = ({ logoUrl, businessName }: { logoUrl?: string, businessName: string }) => {
     const [imageError, setImageError] = useState(false);
+    const imageLoader = ({src}:any) => {
+      return `${src}`;
+    }
+    
 
     if (!logoUrl || imageError) {
       return (
@@ -179,8 +183,11 @@ const UserPage: React.FC = () => {
 
     return (
       <div className="w-12 h-12 relative rounded-md overflow-hidden border border-gray-200">
-        <img
+        <Image
           src={logoUrl}
+          loader={imageLoader}
+          width={1000}
+          height={800}
           alt={`${businessName} logo`}
           className="w-full h-full object-cover"
           onError={() => setImageError(true)}
