@@ -32,24 +32,36 @@ interface UpdateFundabilityScoreModalProps {
 /**
  * Modal for updating fundability score
  */
-const UpdateFundabilityScoreModal: React.FC<UpdateFundabilityScoreModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  currentScore, 
-  onUpdateScore 
+const UpdateFundabilityScoreModal: React.FC<UpdateFundabilityScoreModalProps> = ({
+  isOpen,
+  onClose,
+  currentScore,
+  onUpdateScore
 }) => {
   const [formData, setFormData] = useState<ScoreUpdateData>({
-    newScore: "",
+    newScore: currentScore.toString(),
     reason: "",
   });
   const [error, setError] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
-
+  
+  // Reset form data when modal opens or currentScore changes
+  React.useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        newScore: currentScore.toString(),
+        reason: ""
+      });
+      setError(false);
+      setErrorMessage("");
+    }
+  }, [isOpen, currentScore]);
+  
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-
+  
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
@@ -60,19 +72,18 @@ const UpdateFundabilityScoreModal: React.FC<UpdateFundabilityScoreModalProps> = 
       setErrorMessage("Score must be a number between 0 and 100");
       return;
     }
-
+    
     // Validate reason is provided
     if (!formData.reason.trim()) {
       setError(true);
       setErrorMessage("Please provide a reason for this update");
       return;
     }
-
+    
     // Call the update function
     onUpdateScore(formData);
-    onClose();
   };
-
+  
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Update Fundability Score">
       {error && (
@@ -84,6 +95,16 @@ const UpdateFundabilityScoreModal: React.FC<UpdateFundabilityScoreModalProps> = 
       
       <form onSubmit={handleSubmit}>
         <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Current Score</label>
+            <input
+              type="text"
+              value={currentScore}
+              className="w-full border rounded-md px-3 py-2 border-gray-300 focus:outline-none text-sm bg-gray-100"
+              disabled
+            />
+          </div>
+          
           <div>
             <label className="block text-sm font-medium mb-1">New Score</label>
             <input

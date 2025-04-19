@@ -1,7 +1,7 @@
 import React from "react";
 import Modal from "../Modal";
 
-interface SuspendUserModalProps {
+interface UnsuspendUserModalProps {
   /**
    * Controls whether the modal is visible
    */
@@ -13,35 +13,35 @@ interface SuspendUserModalProps {
   onClose: () => void;
   
   /**
-   * Function to call when the user confirms suspension
+   * Function to call when the user confirms unsuspension
    */
-  onSuspend: () => void;
+  onUnsuspend: () => void;
   
   /**
-   * The name of the user being suspended
+   * The name of the user being unsuspended
    */
   userName?: string;
 }
 
 /**
- * Modal for confirming user suspension
+ * Modal for confirming user unsuspension
  */
-const SuspendUserModal: React.FC<SuspendUserModalProps> = ({
+const UnsuspendUserModal: React.FC<UnsuspendUserModalProps> = ({
   isOpen,
   onClose,
-  onSuspend,
+  onUnsuspend,
   userName = "this user"
 }) => {
   const handleSubmit = () => {
-    onSuspend();
+    onUnsuspend();
     onClose();
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Suspend User">
+    <Modal isOpen={isOpen} onClose={onClose} title="Unsuspend User">
       <div className="py-4">
         <p className="text-center mb-6">
-          Are you sure you want to suspend <span className="font-semibold">{userName}</span>?
+          Are you sure you want to unsuspend <span className="font-semibold">{userName}</span>?
         </p>
         
         <div className="flex gap-3 mt-6">
@@ -54,9 +54,9 @@ const SuspendUserModal: React.FC<SuspendUserModalProps> = ({
           </button>
           <button
             onClick={handleSubmit}
-            className="flex-1 py-2 px-4 bg-red-500 text-white rounded-md text-sm font-medium hover:bg-red-600"
+            className="flex-1 py-2 px-4 bg-green-500 text-white rounded-md text-sm font-medium hover:bg-green-600"
           >
-            Suspend User
+            Unsuspend User
           </button>
         </div>
       </div>
@@ -64,4 +64,4 @@ const SuspendUserModal: React.FC<SuspendUserModalProps> = ({
   );
 };
 
-export default SuspendUserModal;
+export default UnsuspendUserModal;

@@ -12,7 +12,8 @@ interface EditUserSuccessModalProps {
    * Function to call when the modal is closed
    */
   onClose: () => void;
-  text:string
+  text:string,
+  title:string
 }
 
 /**
@@ -21,10 +22,11 @@ interface EditUserSuccessModalProps {
 const EditUserSuccessModal: React.FC<EditUserSuccessModalProps> = ({ 
   isOpen, 
   onClose ,
-  text
+  text,
+  title
 }) => {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Edit User">
+    <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <div className="flex items-center gap-2 text-mainGreen mb-4">
         <CheckCircle size={20} />
         <span> {text}</span>
