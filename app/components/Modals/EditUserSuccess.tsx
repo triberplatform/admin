@@ -13,7 +13,7 @@ interface EditUserSuccessModalProps {
    */
   onClose: () => void;
   text:string,
-  title:string
+  title?:string
 }
 
 /**
@@ -26,7 +26,7 @@ const EditUserSuccessModal: React.FC<EditUserSuccessModalProps> = ({
   title
 }) => {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title}>
+    <Modal isOpen={isOpen} onClose={onClose} title={title || ""}>
       <div className="flex items-center gap-2 text-mainGreen mb-4">
         <CheckCircle size={20} />
         <span> {text}</span>
