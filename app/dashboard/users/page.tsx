@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Header from "@/app/components/Header";
 import {
   Table,
@@ -38,7 +38,7 @@ export default function UsersPage(): React.ReactElement {
   const [isSearchInputActive, setIsSearchInputActive] = useState<boolean>(false);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
   
-  // Determine which users data to show based on whether search is active
+  // When search is active, only show search results. Otherwise show regular users.
   const displayUsers = isSearchActive ? searchResults : users;
   
   useEffect(() => {
@@ -46,21 +46,6 @@ export default function UsersPage(): React.ReactElement {
       getUsers(currentPage, itemsPerPage);
     }
   }, [getUsers, currentPage, itemsPerPage, isSearchActive]);
-  
-  // Memoize the search handler
-  const handleSearch = useCallback(async () => {
-    if (query.trim()) {
-      await searchUsers(query);
-      setIsSearchActive(searchResults && searchResults.length > 0);
-    }
-  }, [query, searchUsers, searchResults]);
-  
-  // Memoize the clear handler
-  const handleClear = useCallback(() => {
-    setQuery("");
-    clearSearch();
-    setIsSearchActive(false);
-  }, [clearSearch]);
   
   // Handle search with debounce
   useEffect(() => {
@@ -83,7 +68,27 @@ export default function UsersPage(): React.ReactElement {
         clearTimeout(searchTimeout.current);
       }
     };
-  }, [query, handleSearch, clearSearch]);
+  }, [query]);
+  
+  // Log search results whenever they change
+  useEffect(() => {
+    console.log("Current search results:", searchResults);
+  }, [searchResults]);
+  
+  const handleSearch = async () => {
+    if (query.trim()) {
+      await searchUsers(query);
+      console.log("Search results:", searchResults);
+      // Activate search mode when we have results
+      setIsSearchActive(true);
+    }
+  };
+
+  const handleClear = () => {
+    setQuery("");
+    clearSearch();
+    setIsSearchActive(false);
+  };
   
   const handleDelete = async (publicId: string): Promise<void> => {
     if (confirm("Are you sure you want to delete this user?")) {
@@ -264,7 +269,7 @@ export default function UsersPage(): React.ReactElement {
               ))
             ) : (
               <TableRow>
-                <TableCell className="text-center py-4">
+                <TableCell  className="text-center py-4">
                   {loading ? "Loading users..." : 
                    searching ? "Searching..." : 
                    isSearchActive ? "No matching users found" : "No users found"}

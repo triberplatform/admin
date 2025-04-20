@@ -10,7 +10,7 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useBusinessStore } from "@/app/store/useBusinessStore";
 import { format } from "date-fns";
-import { BusinessData, FundabilityTestDetail, FundabilityDocs } from "@/app/types/response";
+import { BusinessData, FundabilityTestDetail, FundabilityDocs, StartupTestDetails } from "@/app/types/response";
 import Loading from "@/app/loading";
 
 // Type definitions
@@ -30,7 +30,6 @@ interface DocumentPreviewModalProps {
   document: Document | null;
 }
 
-// Modal component for document preview
 // Modal component for document preview
 const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({ 
   isOpen, 
@@ -128,6 +127,7 @@ const FundabilityDetailsPage: React.FC = () => {
   const {
     businessDetails,
     fundabilityDetails,
+    startupTestDetails,
     dealRoomDetails,
     loading,
     error,
@@ -164,18 +164,42 @@ const FundabilityDetailsPage: React.FC = () => {
     }
   };
 
-  // Map API data to documents
-  const mapFundabilityDocsToDocuments = (): Document[] => {
-    if (!fundabilityDetails?.docs) return [];
+  // Determine if business is a startup or SME based on business stage
+  const isStartup = (): boolean => {
+    if (!businessDetails) return false;
+    
+    // Simply check if the business stage is "startup"
+    return businessDetails.businessStage.toLowerCase() === 'startup';
+  };
+
+  // Get the appropriate details based on business type
+  const getBusinessTypeDetails = () => {
+    if (isStartup()) {
+      return startupTestDetails;
+    } else {
+      return fundabilityDetails;
+    }
+  };
+
+  // Get the appropriate score based on business type
+  const getBusinessScore = (): number => {
+    const details = getBusinessTypeDetails();
+    return details?.score || 0;
+  };
+
+  // Map API data to documents based on business type
+  const mapDocsToDocuments = (): Document[] => {
+    const details = getBusinessTypeDetails();
+    if (!details?.docs) return [];
     
     const docs: Document[] = [];
-    const fileEntries = Object.entries(fundabilityDetails.docs as FundabilityDocs);
+    const fileEntries = Object.entries(details.docs);
     
     fileEntries.forEach(([key, url]) => {
       if (url) {
         // Determine file type from URL or default to PDF
-        const fileType: string = url.toLowerCase().endsWith('.png') ? 'PNG' : 
-                        url.toLowerCase().endsWith('.jpg') || url.toLowerCase().endsWith('.jpeg') ? 'JPG' : 'PDF';
+        const fileType: string = url.toString().toLowerCase().endsWith('.png') ? 'PNG' : 
+                        url.toString().toLowerCase().endsWith('.jpg') || url.toString().toLowerCase().endsWith('.jpeg') ? 'JPG' : 'PDF';
         
         // Format document title (transform camelCase to Title Case)
         const title: string = key
@@ -187,8 +211,8 @@ const FundabilityDetailsPage: React.FC = () => {
           title,
           fileType,
           fileSize: "3.7 MB", // Placeholder size since API doesn't provide this
-          downloadUrl: url,
-          date: fundabilityDetails.updatedAt
+          downloadUrl: url.toString(),
+          date: details.updatedAt
         });
       }
     });
@@ -198,52 +222,80 @@ const FundabilityDetailsPage: React.FC = () => {
 
   // Generate business data items
   const generateBusinessDataItems = (): InfoGridItem[] => {
-    if (!businessDetails || !fundabilityDetails) return [];
+    if (!businessDetails) return [];
+    
+    const details = getBusinessTypeDetails();
+    if (!details) return [];
     
     return [
       { label: "Business Name", value: businessDetails.businessName },
-      { label: "Email", value: fundabilityDetails.companyEmail || businessDetails.businessEmail },
-      { label: "Phone Number", value: fundabilityDetails.contactNumber || businessDetails.businessPhone },
-      { label: "Business Owner", value: fundabilityDetails.legalName || businessDetails.businessName },
+      { label: "Email", value: details.companyEmail || businessDetails.businessEmail },
+      { label: "Phone Number", value: details.contactNumber || businessDetails.businessPhone },
+      { label: "Business Owner", value: details.legalName || businessDetails.businessName },
       { label: "Ownership Type", value: businessDetails.businessLegalEntity.replace(/_/g, " ") },
-      { label: "Location", value: `${fundabilityDetails.city}, ${fundabilityDetails.country}` },
-      { label: "Industry", value: fundabilityDetails.industry || businessDetails.industry },
-      { label: "Address", value: fundabilityDetails.registeredAddress || "Not provided" },
+      { label: "Location", value: `${details.city}, ${details.country}` },
+      { label: "Industry", value: details.industry || businessDetails.industry },
+      { label: "Address", value: details.registeredAddress || "Not provided" },
       { label: "Established", value: formatDate(businessDetails.createdAt) },
     ];
   };
 
   // Generate financial data items
   const generateFinancialDataItems = (): InfoGridItem[] => {
-    if (!dealRoomDetails || !fundabilityDetails) return [];
+    if (!dealRoomDetails || !getBusinessTypeDetails()) return [];
+
+    const details = getBusinessTypeDetails();
     
-    return [
-      { 
-        label: "Average Monthly Sales", 
-        value: dealRoomDetails.averageMonthlySales ? `₦ ${dealRoomDetails.averageMonthlySales.toLocaleString()}` : "Not provided" 
-      },
-      { 
-        label: "Last Reported Yearly Sales", 
-        value: dealRoomDetails.reportedYearlySales ? `₦ ${dealRoomDetails.reportedYearlySales.toLocaleString()}` : 
-              fundabilityDetails.averageAnnualRevenue ? `₦ ${fundabilityDetails.averageAnnualRevenue.toLocaleString()}` : "Not provided" 
-      },
-      { 
-        label: "EBITDA/Operating Profit Margin Percentage", 
-        value: dealRoomDetails.profitMarginPercentage ? `${dealRoomDetails.profitMarginPercentage}%` : "Not provided" 
-      },
-      { 
-        label: "Total Asset Valuation", 
-        value: dealRoomDetails.valueOfPhysicalAssets ? `₦ ${dealRoomDetails.valueOfPhysicalAssets.toLocaleString()}` : "Not provided" 
-      },
-      { 
-        label: "Tentative Business Selling Price", 
-        value: dealRoomDetails.tentativeSellingPrice ? `₦ ${dealRoomDetails.tentativeSellingPrice.toLocaleString()}` : "Not provided" 
-      },
-      { 
-        label: "Reason for Sale", 
-        value: dealRoomDetails.reasonForSale || "Not provided" 
-      },
-    ];
+    if (isStartup()) {
+      // For startups
+      return [
+        { 
+          label: "Customer Lifetime Value", 
+          value: (startupTestDetails?.customerLifetimeValue) ? `₦ ${startupTestDetails.customerLifetimeValue.toLocaleString()}` : "Not provided" 
+        },
+        { 
+          label: "Customer Acquisition Cost", 
+          value: (startupTestDetails?.customerAcquisitionCost) ? `₦ ${startupTestDetails.customerAcquisitionCost.toLocaleString()}` : "Not provided" 
+        },
+        { 
+          label: "Expected Annual Growth Rate", 
+          value: (startupTestDetails?.expectedAnnualGrowthRate) ? `${startupTestDetails.expectedAnnualGrowthRate}%` : "Not provided" 
+        },
+        { 
+          label: "Total Addressable Market", 
+          value: (startupTestDetails?.totalAddressableMarket) ? `₦ ${startupTestDetails.totalAddressableMarket.toLocaleString()}` : "Not provided" 
+        }
+      ];
+    } else {
+      // For SMEs
+      return [
+        { 
+          label: "Average Monthly Sales", 
+          value: dealRoomDetails.averageMonthlySales ? `₦ ${dealRoomDetails.averageMonthlySales.toLocaleString()}` : "Not provided" 
+        },
+        { 
+          label: "Last Reported Yearly Sales", 
+          value: dealRoomDetails.reportedYearlySales ? `₦ ${dealRoomDetails.reportedYearlySales.toLocaleString()}` : 
+                fundabilityDetails?.averageAnnualRevenue ? `₦ ${fundabilityDetails.averageAnnualRevenue.toLocaleString()}` : "Not provided" 
+        },
+        { 
+          label: "EBITDA/Operating Profit Margin Percentage", 
+          value: dealRoomDetails.profitMarginPercentage ? `${dealRoomDetails.profitMarginPercentage}%` : "Not provided" 
+        },
+        { 
+          label: "Total Asset Valuation", 
+          value: dealRoomDetails.valueOfPhysicalAssets ? `₦ ${dealRoomDetails.valueOfPhysicalAssets.toLocaleString()}` : "Not provided" 
+        },
+        { 
+          label: "Tentative Business Selling Price", 
+          value: dealRoomDetails.tentativeSellingPrice ? `₦ ${dealRoomDetails.tentativeSellingPrice.toLocaleString()}` : "Not provided" 
+        },
+        { 
+          label: "Reason for Sale", 
+          value: dealRoomDetails.reasonForSale || "Not provided" 
+        },
+      ];
+    }
   };
 
   // Show loading indicator while data is being fetched
@@ -260,44 +312,59 @@ const FundabilityDetailsPage: React.FC = () => {
     );
   }
 
-  // Only show "No fundability details found" if data has been fetched (not loading) 
-  // and either businessDetails or fundabilityDetails is missing
-  if (dataFetched && (!businessDetails || !fundabilityDetails)) {
+  // Check if we have the needed data based on business type
+  const hasRequiredData = () => {
+    if (!businessDetails) return false;
+    
+    // For startups, check startupTestDetails
+    if (isStartup()) {
+      return !!startupTestDetails;
+    } 
+    // For SMEs, check fundabilityDetails
+    else {
+      return !!fundabilityDetails;
+    }
+  };
+
+  // Only show "No details found" if data has been fetched (not loading) 
+  // and the required details for the business type are missing
+  if (dataFetched && !hasRequiredData()) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p>No fundability details found.</p>
+        <p>No {isStartup() ? 'startup test' : 'fundability'} details found for this business.</p>
       </div>
     );
   }
 
   // If we're still waiting for data and not in an error state, show loading
-  if (!businessDetails || !fundabilityDetails) {
+  if (!businessDetails || !getBusinessTypeDetails()) {
     return <Loading isVisible={true} />;
   }
 
-  const documents: Document[] = mapFundabilityDocsToDocuments();
+  const documents: Document[] = mapDocsToDocuments();
+  const details = getBusinessTypeDetails();
 
   return (
     <div className="px-6 ml-[20%]">
       <Header />
       <Breadcrumb />
       
-      {/* Fundability Score Section */}
+      {/* Score Section - Different title based on business type */}
       <div className="py-6">
         <p className="font-semibold items-center mb-5 flex gap-2">
           <Image
-            src="/fundability.svg"
-            alt="Fundability"
+            src={isStartup() ? "/startup.svg" : "/fundability.svg"}
+            alt={isStartup() ? "Startup Test" : "Fundability"}
             width={20}
             height={20}
             className="object-cover"
           />{" "}
-          Fundability Score
+          {isStartup() ? "Startup Test Score" : "Fundability Score"}
         </p>
         <CircularProgress2 
           size={90} 
           textSize="15px" 
-          percentage={fundabilityDetails.score || 0} 
+          percentage={getBusinessScore()} 
         />
         <div className="mt-4">
           <Link 
@@ -340,27 +407,27 @@ const FundabilityDetailsPage: React.FC = () => {
           <div>
             <InfoGrid 
               items={[
-                { label: "Registered Company", value: fundabilityDetails.registeredCompany ? "Yes" : "No" },
-                { label: "Legal Name", value: fundabilityDetails.legalName || "Not provided" },
-                { label: "Type of Company Registration", value: fundabilityDetails.companyRegistration || "Not provided" },
-                { label: "City", value: fundabilityDetails.city || "Not provided" },
-                { label: "Registered Address", value: fundabilityDetails.registeredAddress || "Not provided" },
-                { label: "Current Business Stage", value: fundabilityDetails.startupStage || "Not provided" },
-                { label: "Position", value: fundabilityDetails.position || "Not provided" },
-                { label: "Title", value: fundabilityDetails.title || "Not provided" },
+                { label: "Registered Company", value: details?.registeredCompany ? "Yes" : "No" },
+                { label: "Legal Name", value: details?.legalName || "Not provided" },
+                { label: "Type of Company Registration", value: details?.companyRegistration || "Not provided" },
+                { label: "City", value: details?.city || "Not provided" },
+                { label: "Registered Address", value: details?.registeredAddress || "Not provided" },
+                { label: "Current Business Stage", value: details?.startupStage || "Not provided" },
+                { label: "Position", value: details?.position || "Not provided" },
+                { label: "Title", value: details?.title || "Not provided" },
               ]} 
             />
           </div>
           <div>
             <InfoGrid 
               items={[
-                { label: "Company Email Address", value: fundabilityDetails.companyEmail || "Not provided" },
-                { label: "Contact Number", value: fundabilityDetails.contactNumber || "Not provided" },
-                { label: "Principal Address", value: fundabilityDetails.principalAddress || "Not provided" },
-                { label: "Applicant's Email Address", value: fundabilityDetails.applicantsAddress || "Not provided" },
-                { label: "Years of Operation", value: fundabilityDetails.yearsOfOperation?.toString() || "Not provided" },
-                { label: "Company Size (Number of Employees)", value: fundabilityDetails.companySize?.toString() || "Not provided" },
-                { label: "Has your company been involved in a legal case?", value: fundabilityDetails.companyLegalCases ? "Yes" : "No" },
+                { label: "Company Email Address", value: details?.companyEmail || "Not provided" },
+                { label: "Contact Number", value: details?.contactNumber || "Not provided" },
+                { label: "Principal Address", value: details?.principalAddress || "Not provided" },
+                { label: "Applicant's Email Address", value: details?.applicantsAddress || "Not provided" },
+                { label: "Years of Operation", value: details?.yearsOfOperation?.toString() || "Not provided" },
+                { label: "Company Size (Number of Employees)", value: details?.companySize?.toString() || "Not provided" },
+                { label: "Has your company been involved in a legal case?", value: details?.companyLegalCases ? "Yes" : "No" },
               ]} 
             />
           </div>
@@ -384,13 +451,13 @@ const FundabilityDetailsPage: React.FC = () => {
           <div className="border border-gray-200 rounded-lg p-4">
             <h3 className="text-green-600 font-medium mb-4">Ownership</h3>
             <div className="space-y-4">
-              {fundabilityDetails.ownership?.map((owner: string, index: number) => (
+              {details?.ownership?.map((owner: string, index: number) => (
                 <div key={`owner-${index}`} className="border-t pt-2">
                   <p className="text-gray-600 text-sm mb-1">Owner {index + 1}</p>
                   <p className="font-medium text-sm">{owner}</p>
                 </div>
               ))}
-              {(!fundabilityDetails.ownership || fundabilityDetails.ownership.length === 0) && (
+              {(!details?.ownership || details?.ownership.length === 0) && (
                 <p className="text-gray-500 text-sm">No ownership information provided</p>
               )}
             </div>
@@ -400,13 +467,13 @@ const FundabilityDetailsPage: React.FC = () => {
           <div className="border border-gray-200 rounded-lg p-4">
             <h3 className="text-green-600 font-medium mb-4">Executive Management</h3>
             <div className="space-y-4">
-              {fundabilityDetails.executiveManagement?.map((exec: string, index: number) => (
+              {details?.executiveManagement?.map((exec: string, index: number) => (
                 <div key={`exec-${index}`} className="border-t pt-2">
                   <p className="text-gray-600 text-sm mb-1">Executive Management {index + 1}</p>
                   <p className="font-medium text-sm">{exec}</p>
                 </div>
               ))}
-              {(!fundabilityDetails.executiveManagement || fundabilityDetails.executiveManagement.length === 0) && (
+              {(!details?.executiveManagement || details?.executiveManagement.length === 0) && (
                 <p className="text-gray-500 text-sm">No executive management information provided</p>
               )}
             </div>
@@ -416,13 +483,13 @@ const FundabilityDetailsPage: React.FC = () => {
           <div className="border border-gray-200 rounded-lg p-4">
             <h3 className="text-green-600 font-medium mb-4">Legal Advisors</h3>
             <div className="space-y-4">
-              {fundabilityDetails.legalAdvisors?.map((advisor: string, index: number) => (
+              {details?.legalAdvisors?.map((advisor: string, index: number) => (
                 <div key={`advisor-${index}`} className="border-t pt-2">
                   <p className="text-gray-600 text-sm mb-1">Legal Advisor {index + 1}</p>
                   <p className="font-medium text-sm">{advisor}</p>
                 </div>
               ))}
-              {(!fundabilityDetails.legalAdvisors || fundabilityDetails.legalAdvisors.length === 0) && (
+              {(!details?.legalAdvisors || details.legalAdvisors.length === 0) && (
                 <p className="text-gray-500 text-sm">No legal advisor information provided</p>
               )}
             </div>
@@ -433,13 +500,13 @@ const FundabilityDetailsPage: React.FC = () => {
         <div className="mt-6 border border-gray-200 rounded-lg p-4">
           <h3 className="text-green-600 font-medium mb-4">Board of Directors</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {fundabilityDetails.boardOfDirectors?.map((director: string, index: number) => (
+            {details?.boardOfDirectors?.map((director: string, index: number) => (
               <div key={`director-${index}`} className="border-t pt-2">
                 <p className="text-gray-600 text-sm mb-1">Director {index + 1}</p>
                 <p className="font-medium text-sm">{director}</p>
               </div>
             ))}
-            {(!fundabilityDetails.boardOfDirectors || fundabilityDetails.boardOfDirectors.length === 0) && (
+            {(!details?.boardOfDirectors || details?.boardOfDirectors.length === 0) && (
               <p className="text-gray-500 text-sm">No board of directors information provided</p>
             )}
           </div>
@@ -451,17 +518,17 @@ const FundabilityDetailsPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <p className="text-gray-600 text-sm mb-1">ISIC Industry</p>
-              <p className="font-medium text-sm">{fundabilityDetails.isicIndustry ? fundabilityDetails.industry : "Not specified"}</p>
+              <p className="font-medium text-sm">{details?.isicIndustry ? details?.industry : "Not specified"}</p>
             </div>
             <div>
               <p className="text-gray-600 text-sm mb-1">ISIC Activities</p>
-              <p className="font-medium text-sm">{fundabilityDetails.isicActivity || "Not specified"}</p>
+              <p className="font-medium text-sm">{details?.isicActivity || "Not specified"}</p>
             </div>
           </div>
         </div>
       </div>
       
-      {/* Financial Information Section */}
+      {/* Financial Information Section - Different fields based on business type */}
       <div className="mt-10 mb-10">
         <p className="font-semibold items-center mb-5 flex gap-2">
           <Image
@@ -474,30 +541,62 @@ const FundabilityDetailsPage: React.FC = () => {
           Financial Information
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div>
-            <InfoGrid 
-              items={[
-                { label: "Average Annual Revenue", value: fundabilityDetails.averageAnnualRevenue ? `₦ ${fundabilityDetails.averageAnnualRevenue.toLocaleString()}` : "Not provided" },
-                { label: "Revenue Growth Rate", value: fundabilityDetails.revenueGrowthRate ? `${fundabilityDetails.revenueGrowthRate}%` : "Not provided" },
-                { label: "Audited Financial Statement", value: fundabilityDetails.auditedFinancialStatement ? "Yes" : "No" },
-                { label: "Company has a 5-year financial cashflow?", value: fundabilityDetails.company5yearCashFlow ? "Yes" : "No" },
-                { label: "Company has been 3 years profitable?", value: fundabilityDetails.company3YearProfitable ? "Yes" : "No" },
-              ]} 
-            />
-          </div>
-          <div>
-            <InfoGrid 
-              items={[
-                { label: "Company has a Pitch Deck?", value: fundabilityDetails.companyPitchDeck ? "Yes" : "No" },
-                { label: "Company has a Business Plan?", value: fundabilityDetails.companyBusinessPlan ? "Yes" : "No" },
-                { label: "Company possesses Solid Asset Holding?", value: fundabilityDetails.companySolidAssetHolding ? "Yes" : "No" },
-                { label: "Company possesses a Large Inventory Value?", value: fundabilityDetails.companyLargeInventory ? "Yes" : "No" },
-                { label: "Company has a High Growth Potential", value: fundabilityDetails.companyHighScalibilty ? "Yes" : "No" },
-                { label: "Company possesses any current liabilities?", value: fundabilityDetails.companyCurrentLiabilities ? "Yes" : "No" },
-                { label: "Owner/proprietor possesses any current liabilities?", value: fundabilityDetails.ownerCurrentLiabilities ? "Yes" : "No" },
-              ]} 
-            />
-          </div>
+          {isStartup() ? (
+            // Startup-specific financial fields
+            <>
+              <div>
+                <InfoGrid 
+                  items={[
+                    { label: "Customer Lifetime Value", value: startupTestDetails?.customerLifetimeValue ? `₦ ${startupTestDetails.customerLifetimeValue.toLocaleString()}` : "Not provided" },
+                    { label: "Customer Acquisition Cost", value: startupTestDetails?.customerAcquisitionCost ? `₦ ${startupTestDetails.customerAcquisitionCost.toLocaleString()}` : "Not provided" },
+                    { label: "Expected Annual Growth Rate", value: startupTestDetails?.expectedAnnualGrowthRate ? `${startupTestDetails.expectedAnnualGrowthRate}%` : "Not provided" },
+                    { label: "Total Addressable Market", value: startupTestDetails?.totalAddressableMarket ? `₦ ${startupTestDetails.totalAddressableMarket.toLocaleString()}` : "Not provided" },
+                  ]} 
+                />
+              </div>
+              <div>
+                <InfoGrid 
+                  items={[
+                    { label: "Company has a Pitch Deck?", value: startupTestDetails?.companyPitchDeck ? "Yes" : "No" },
+                    { label: "Company has a Business Plan?", value: startupTestDetails?.companyBusinessPlan ? "Yes" : "No" },
+                    { label: "Company possesses Solid Asset Holding?", value: startupTestDetails?.companySolidAssetHolding ? "Yes" : "No" },
+                    { label: "Company possesses a Large Inventory Value?", value: startupTestDetails?.companyLargeInventory ? "Yes" : "No" },
+                    { label: "Company has a High Growth Potential", value: startupTestDetails?.companyHighScalibilty ? "Yes" : "No" },
+                    { label: "Company possesses any current liabilities?", value: startupTestDetails?.companyCurrentLiabilities ? "Yes" : "No" },
+                    { label: "Owner/proprietor possesses any current liabilities?", value: startupTestDetails?.ownerCurrentLiabilities ? "Yes" : "No" },
+                  ]} 
+                />
+              </div>
+            </>
+          ) : (
+            // SME-specific financial fields
+            <>
+              <div>
+                <InfoGrid 
+                  items={[
+                    { label: "Average Annual Revenue", value: fundabilityDetails?.averageAnnualRevenue ? `₦ ${fundabilityDetails.averageAnnualRevenue.toLocaleString()}` : "Not provided" },
+                    { label: "Revenue Growth Rate", value: fundabilityDetails?.revenueGrowthRate ? `${fundabilityDetails.revenueGrowthRate}%` : "Not provided" },
+                    { label: "Audited Financial Statement", value: fundabilityDetails?.auditedFinancialStatement ? "Yes" : "No" },
+                    { label: "Company has a 5-year financial cashflow?", value: fundabilityDetails?.company5yearCashFlow ? "Yes" : "No" },
+                    { label: "Company has been 3 years profitable?", value: fundabilityDetails?.company3YearProfitable ? "Yes" : "No" },
+                  ]} 
+                />
+              </div>
+              <div>
+                <InfoGrid 
+                  items={[
+                    { label: "Company has a Pitch Deck?", value: fundabilityDetails?.companyPitchDeck ? "Yes" : "No" },
+                    { label: "Company has a Business Plan?", value: fundabilityDetails?.companyBusinessPlan ? "Yes" : "No" },
+                    { label: "Company possesses Solid Asset Holding?", value: fundabilityDetails?.companySolidAssetHolding ? "Yes" : "No" },
+                    { label: "Company possesses a Large Inventory Value?", value: fundabilityDetails?.companyLargeInventory ? "Yes" : "No" },
+                    { label: "Company has a High Growth Potential", value: fundabilityDetails?.companyHighScalibilty ? "Yes" : "No" },
+                    { label: "Company possesses any current liabilities?", value: fundabilityDetails?.companyCurrentLiabilities ? "Yes" : "No" },
+                    { label: "Owner/proprietor possesses any current liabilities?", value: fundabilityDetails?.ownerCurrentLiabilities ? "Yes" : "No" },
+                  ]} 
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
       

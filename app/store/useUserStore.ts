@@ -86,17 +86,24 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
       const response = await apiClient.post<{
         success: boolean, 
         message: string, 
-        data: { users: UserData[] }
+        data: UserData[] // Changed from data: { users: UserData[] }
       }>('/users/search', payload);
       
+      // Log the response structure
+      console.log("Search API response:", response.data);
+      
       set({
-        searchResults: response.data.data.users,
+        searchResults: response.data.data, // Changed from response.data.data.users
         searching: false,
         message: response.data.message,
         success: response.data.success
       });
+      
+      // Log the updated search results
+      console.log("Search results set to:", response.data.data);
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Failed to search users';
+      console.error("Search error:", errorMessage);
       
       set({
         error: errorMessage,

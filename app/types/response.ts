@@ -190,8 +190,69 @@ export interface BusinessData {
   createdAt: string;
   updatedAt: string;
   businessVerificationStatus: boolean;
+  startupTestDetails:StartupTestDetails;
   fundabilityTestDetails: FundabilityTestDetail;
   dealRoomDetails: DealRoomDetail;
+}
+
+export interface StartupTestDocs {
+  pitchDeck: string | null;
+  businessPlan: string | null;
+  statusReport: string | null;
+  relevantLicenses: string | null;
+  financialStatements: string | null;
+  letterOfGoodStanding: string | null;
+  memorandumOfAssociation: string | null;
+  companyLiabilitySchedule: string | null;
+  certificateOfIncorporation: string | null;
+}
+
+export interface StartupTestDetails {
+  id: number;
+  userId: number;
+  publicId: string;
+  score: number;
+  businessId: string;
+  registeredCompany: boolean;
+  legalName: string;
+  companyRegistration: string;
+  city: string;
+  country: string;
+  industry: string;
+  registeredAddress: string;
+  companyEmail: string;
+  contactNumber: string;
+  principalAddress: string;
+  applicantsAddress: string;
+  position: string;
+  title: string;
+  yearsOfOperation: number;
+  companySize: number;
+  companyLegalCases: boolean;
+  startupStage: string;
+  ownership: string[];
+  executiveManagement: string[];
+  boardOfDirectors: string[];
+  isicIndustry: boolean;
+  isicActivity: string;
+  legalAdvisors: string[];
+  totalAddressableMarket: number;
+  licensesToOperate: boolean;
+  companyPitchDeck: boolean;
+  companyBusinessPlan: boolean;
+  company5yearCashFlow: boolean;
+  companySolidAssetHolding: boolean;
+  companyLargeInventory: boolean;
+  company3YearProfitable: boolean;
+  companyHighScalibilty: boolean;
+  companyCurrentLiabilities: boolean;
+  ownerCurrentLiabilities: boolean;
+  customerLifetimeValue: number;
+  customerAcquisitionCost: number;
+  expectedAnnualGrowthRate: number;
+  docs: StartupTestDocs;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Enum Types

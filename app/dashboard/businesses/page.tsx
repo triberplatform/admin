@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Header from "@/app/components/Header";
 import Breadcrumb from "@/app/components/BreadCrumb";
 import {
@@ -12,7 +12,7 @@ import {
 } from "@/app/components/Table";
 import CircularProgress from "@/app/components/CircularProgress";
 import { useBusinessStore } from "@/app/store/useBusinessStore";
-import { Briefcase, Trash2, FileText, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Briefcase, Trash2, FileText, RefreshCw, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import Link from "next/link";
 import { BusinessData } from "@/app/types/response";
 import Loading from "@/app/loading";
@@ -143,7 +143,19 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
 };
 
 export default function BusinessesPage() {
-  const { businesses, pagination, loading, error, getBusinesses, deleteBusiness } = useBusinessStore();
+  const { 
+    businesses, 
+    searchResults, 
+    pagination, 
+    loading, 
+    searching, 
+    error, 
+    getBusinesses, 
+    deleteBusiness,
+    searchBusinesses,
+    clearSearch 
+  } = useBusinessStore();
+  
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
   const [businessToDelete, setBusinessToDelete] = useState<BusinessData | null>(null);
@@ -151,11 +163,65 @@ export default function BusinessesPage() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  
+  // Search states
+  const [isSearchActive, setIsSearchActive] = useState<boolean>(false);
+  const [query, setQuery] = useState<string>("");
+  const [isSearchInputActive, setIsSearchInputActive] = useState<boolean>(false);
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  
+  // Determine which businesses data to show based on whether search is active
+  const displayBusinesses = isSearchActive ? searchResults : businesses;
 
   // Fetch businesses on component mount and when pagination changes
   useEffect(() => {
-    getBusinesses(currentPage, itemsPerPage);
-  }, [getBusinesses, currentPage, itemsPerPage]);
+    if (!isSearchActive) {
+      getBusinesses(currentPage, itemsPerPage);
+    }
+  }, [getBusinesses, currentPage, itemsPerPage, isSearchActive]);
+  
+  // Handle search with debounce
+  useEffect(() => {
+    // Debounce search function
+    if (query.trim()) {
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current);
+      }
+      
+      searchTimeout.current = setTimeout(() => {
+        handleSearch();
+      }, 500); // 500ms debounce
+    } else {
+      clearSearch();
+      setIsSearchActive(false);
+    }
+    
+    return () => {
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current);
+      }
+    };
+  }, [query]);
+  
+  // Log search results whenever they change
+  useEffect(() => {
+    console.log("Current business search results:", searchResults);
+  }, [searchResults]);
+
+  const handleSearch = async () => {
+    if (query.trim()) {
+      await searchBusinesses(query);
+      console.log("Search results:", searchResults);
+      // Activate search mode when search is executed
+      setIsSearchActive(true);
+    }
+  };
+
+  const handleClear = () => {
+    setQuery("");
+    clearSearch();
+    setIsSearchActive(false);
+  };
 
   // Handle delete button click
   const handleDeleteClick = (business: BusinessData) => {
@@ -215,20 +281,74 @@ export default function BusinessesPage() {
             <Briefcase size={15} /> Businesses
           </p>
           
-          <div className="flex gap-4">
+          <div className="flex items-center gap-4">
+            {/* Refresh Button */}
             <button 
-              onClick={() => getBusinesses(currentPage, itemsPerPage)}
-              className="px-4 py-2 border border-gray-300 rounded-md flex items-center gap-2 hover:bg-gray-50"
-              disabled={loading}
+              onClick={() => {
+                if (isSearchActive) {
+                  // If search is active, re-run search
+                  if (query.trim()) {
+                    searchBusinesses(query);
+                  }
+                } else {
+                  // If not in search mode, refresh businesses list
+                  getBusinesses(currentPage, itemsPerPage);
+                }
+              }}
+              className="px-4 py-2 text-sm border border-gray-300 text-mainGreen rounded-md flex items-center gap-2 hover:bg-gray-50"
+              disabled={loading || searching}
             >
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={16} className={(loading || searching) ? "animate-spin" : ""} />
               Refresh
             </button>
+            
+            {/* Integrated Search Component */}
+            <div className="relative w-full max-w-md">
+              <div className={`flex items-center border rounded-md overflow-hidden transition-all ${isSearchInputActive ? 'ring-2 ring-blue-300' : ''}`}>
+                <div className="flex items-center justify-center pl-3">
+                  <Search size={18} className="text-gray-400" />
+                </div>
+                
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onFocus={() => setIsSearchInputActive(true)}
+                  onBlur={() => setIsSearchInputActive(false)}
+                  placeholder="Search businesses by name, email or industry..."
+                  className="w-full py-2 px-3 outline-none text-sm"
+                />
+                
+                {query && (
+                  <button 
+                    onClick={handleClear} 
+                    className="flex items-center justify-center pr-3"
+                  >
+                    <X size={16} className="text-gray-400 hover:text-gray-600" />
+                  </button>
+                )}
+              </div>
+              
+              {searching && (
+                <div className="absolute right-3 top-2.5">
+                  <div className="w-4 h-4 border-t-2 border-r-2 border-blue-500 rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
         
-        {
-         error ? (
+        <div className="flex justify-between items-center mb-4">
+          {error && <p className="text-red-500">{error}</p>}
+          
+          {isSearchActive && searchResults && (
+            <p className="text-sm text-gray-500">
+              Found {searchResults.length} business{searchResults.length !== 1 ? 'es' : ''}
+            </p>
+          )}
+        </div>
+        
+        {error && !isSearchActive ? (
           <div className="flex justify-center items-center h-64">
             <div className="bg-red-50 border border-red-200 rounded-md p-4 max-w-md">
               <p className="text-red-600">{error}</p>
@@ -255,14 +375,16 @@ export default function BusinessesPage() {
             </TableHead>
 
             <TableBody>
-              {businesses.length === 0 ? (
+              {displayBusinesses.length === 0 ? (
                 <TableRow>
                   <TableCell className="text-center py-8 text-gray-500">
-                    No businesses available.
+                    {loading ? "Loading businesses..." : 
+                     searching ? "Searching..." : 
+                     isSearchActive ? "No matching businesses found" : "No businesses available."}
                   </TableCell>
                 </TableRow>
               ) : (
-                businesses.map((business: BusinessData) => (
+                displayBusinesses.map((business: BusinessData) => (
                   <TableRow 
                     key={business.publicId} 
                     link={`/dashboard/businesses/business-details?id=${business.publicId}`}
@@ -301,8 +423,8 @@ export default function BusinessesPage() {
           </Table>
         )}
 
-        {/* Pagination Controls */}
-        {pagination && pagination.totalPages > 0 && (
+        {/* Pagination Controls - Only show when not in search mode */}
+        {!isSearchActive && pagination && pagination.totalPages > 0 && (
           <div className="flex justify-between items-center mt-4">
             <div className="text-sm text-gray-500">
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, pagination.total)} of {pagination.total} entries

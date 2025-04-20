@@ -99,7 +99,7 @@ apiClient.interceptors.response.use(
       sessionStorage.setItem('auth_redirected', 'true');
       
       // Redirect to login
-    //   window.location.href = '/';
+      window.location.href = '/';
     }
     
     return Promise.reject(error);

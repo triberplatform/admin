@@ -1,14 +1,13 @@
 "use client";
 import Breadcrumb from "@/app/components/BreadCrumb";
-
 import CircularProgress2 from "@/app/components/CircularProgress2";
+import DocumentCard from "@/app/components/DocumentCard";
 import EditBusinessModal from "@/app/components/Forms/EditBusiness";
 import UpdateFundabilityScoreModal from "@/app/components/Forms/UpdateFundability";
 import Header from "@/app/components/Header";
 import { InfoGrid, InfoGridItem } from "@/app/components/infoGrid";
 import EditUserFailureModal from "@/app/components/Modals/EditUserFailure";
 import EditUserSuccessModal from "@/app/components/Modals/EditUserSuccess";
-
 import SuspendUserFailureModal from "@/app/components/Modals/SuspendUserFailure";
 import UpdateScoreSuccessModal from "@/app/components/Modals/UpdateFundabilityModal";
 import VerifyBusinessModal from "@/app/components/VerifyModal";
@@ -30,20 +29,29 @@ import { useSearchParams } from "next/navigation";
 import { useBusinessStore } from "@/app/store/useBusinessStore";
 import { useFundabilityStore } from "@/app/store/useFundabilityStore";
 import { format } from "date-fns";
-import { CheckCircle, BadgeCheck } from "lucide-react";
+import { CheckCircle, BadgeCheck, File } from "lucide-react";
 import Loading from "@/app/loading";
 
 const imageLoader = ({src}:any) => {
   return `${src}`;
 }
 
-// Type definition for business form data
-interface BusinessFormData {
+// Type definition for business form data with optional fields
+interface BusinessData {
   businessName: string;
+  businessEmail: string;
+  businessPhone: string;
   location: string;
   industry: string;
-  established: string;
-  ownershipType: string;
+  yearEstablished: string | number;
+  businessLegalEntity: string;
+  description: string;
+  interestedIn?: string;  // Optional fields
+  numOfEmployees?: string;
+  assets?: string;
+  reportedSales?: string;
+  businessStage?: string;
+  businessStatus?: string;
 }
 
 interface UpdateScoreData {
@@ -57,6 +65,109 @@ interface ScoreHistoryItem {
   reason: string;
   updatedBy: string;
 }
+
+// Type definition for document
+interface Document {
+  id: string;
+  title: string;
+  fileType?: string;
+  fileSize: string;
+  downloadUrl: string;
+  date?: string;
+}
+
+// Props type for DocumentPreviewModal
+interface DocumentPreviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  document: Document | null;
+}
+
+// Document Preview Modal Component
+const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  document 
+}) => {
+  if (!isOpen || !document) return null;
+
+  // Determine content type based on fileType
+  const isImage = document.fileType === 'JPG' || document.fileType === 'PNG';
+
+  // Handle file download
+  const handleDownload = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    
+    // Use window.document to explicitly access the DOM Document interface
+    const link = window.document.createElement('a');
+    link.href = document.downloadUrl;
+    link.download = document.title;
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-lg font-medium">{document.title}</h3>
+          <button 
+            onClick={onClose} 
+            className="text-gray-400 hover:text-gray-600"
+            aria-label="Close preview"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          {isImage ? (
+            // Render image
+            <div className="flex justify-center">
+              <Image
+                src={document.downloadUrl} 
+                loader={imageLoader}
+                width={1000}
+                height={1000}
+                alt={document.title} 
+                className="max-w-full max-h-[70vh] object-contain" 
+              />
+            </div>
+          ) : (
+            // Render iframe for PDF
+            <iframe 
+              src={document.downloadUrl} 
+              className="w-full h-[70vh]" 
+              title={document.title}
+            />
+          )}
+        </div>
+        <div className="p-4 border-t flex justify-between items-center">
+          <div className="text-sm text-gray-500">
+            {document.fileType} · {document.fileSize} · {document.date ? format(new Date(document.date), "dd MMM yyyy") : "No date"}
+          </div>
+          <Link 
+            href={document.downloadUrl}
+            passHref
+            legacyBehavior
+          >
+            <a
+              download={document.title}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleDownload}
+            >
+              Download
+            </a>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function Page(): React.ReactElement {
   const searchParams = useSearchParams();
@@ -73,7 +184,9 @@ export default function Page(): React.ReactElement {
     error,
     getBusinessById,
     verifyBusiness,
-    verifying
+    verifying,
+    editBusiness,
+    editing
   } = useBusinessStore();
 
   // Get the updateScore function from the fundability store
@@ -92,13 +205,21 @@ export default function Page(): React.ReactElement {
   const [scoreHistory, setScoreHistory] = useState<ScoreHistoryItem[]>([]);
   const [updatedScore, setUpdatedScore] = useState<number>(0);
   
-  // Initialize business form data for the edit modal
-  const [businessFormData, setBusinessFormData] = useState<BusinessFormData>({
+  // Document preview states
+  const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
+  
+  // Initialize business form data for the edit modal with proper typing for optional fields
+  const [businessFormData, setBusinessFormData] = useState<BusinessData>({
     businessName: "",
+    businessEmail: "",
+    businessPhone: "",
     location: "",
     industry: "",
-    established: "",
-    ownershipType: ""
+    yearEstablished: "",
+    businessLegalEntity: "",
+    description: "",
+    // Optional fields are not included by default
   });
 
   // Load business data when component mounts or businessId changes
@@ -115,13 +236,27 @@ export default function Page(): React.ReactElement {
   // Update local form data when business details are fetched
   useEffect(() => {
     if (businessDetails) {
-      setBusinessFormData({
-        businessName: businessDetails.businessName,
-        location: businessDetails.location,
-        industry: businessDetails.industry,
-        established: businessDetails.yearEstablished?.toString() || "",
-        ownershipType: businessDetails.businessLegalEntity || ""
-      });
+      // Create a base object with required fields
+      const baseFormData: BusinessData = {
+        businessName: businessDetails.businessName || "",
+        businessEmail: businessDetails.businessEmail || "",
+        businessPhone: businessDetails.businessPhone || "",
+        location: businessDetails.location || "",
+        industry: businessDetails.industry || "",
+        yearEstablished: businessDetails.yearEstablished?.toString() || "",
+        businessLegalEntity: businessDetails.businessLegalEntity || "",
+        description: businessDetails.description || "",
+      };
+      
+      // Add optional fields only if they exist
+      if (businessDetails.interestedIn) baseFormData.interestedIn = businessDetails.interestedIn;
+      if (businessDetails.numOfEmployees) baseFormData.numOfEmployees = businessDetails.numOfEmployees;
+      if (businessDetails.assets) baseFormData.assets = businessDetails.assets;
+      if (businessDetails.reportedSales) baseFormData.reportedSales = businessDetails.reportedSales;
+      if (businessDetails.businessStage) baseFormData.businessStage = businessDetails.businessStage;
+      if (businessDetails.businessStatus) baseFormData.businessStatus = businessDetails.businessStatus;
+      
+      setBusinessFormData(baseFormData);
       
       // Initialize score history if fundabilityDetails exists
       if (fundabilityDetails) {
@@ -211,12 +346,55 @@ export default function Page(): React.ReactElement {
     }
   };
 
-  const handleUpdate = (updatedData: BusinessFormData): void => {
-    setBusinessFormData(updatedData);
-    setIsEditSuccessModalOpen(true);
-    console.log("Business updated:", updatedData);
+  // Handle updating a business with proper typing
+  const handleUpdate = async (updatedData: BusinessData): Promise<void> => {
+    try {
+      // Create payload with only necessary fields
+      const payload: any = {
+        businessName: updatedData.businessName,
+        businessEmail: updatedData.businessEmail,
+        businessPhone: updatedData.businessPhone,
+        location: updatedData.location,
+        industry: updatedData.industry,
+        businessLegalEntity: updatedData.businessLegalEntity,
+        description: updatedData.description,
+        yearEstablished: Number(updatedData.yearEstablished),
+      };
+      
+      // Only add optional fields if they are defined
+      if (updatedData.interestedIn) payload.interestedIn = updatedData.interestedIn;
+      if (updatedData.numOfEmployees) payload.numOfEmployees = updatedData.numOfEmployees;
+      if (updatedData.assets) payload.assets = updatedData.assets;
+      if (updatedData.reportedSales) payload.reportedSales = updatedData.reportedSales;
+      if (updatedData.businessStage) payload.businessStage = updatedData.businessStage;
+      if (updatedData.businessStatus) payload.businessStatus = updatedData.businessStatus;
+      
+      // Log the payload for debugging
+      console.log("Update business payload:", payload);
+      
+      // Update the business using the store
+      const result = await editBusiness(businessId, payload);
+      
+      console.log("Update business result:", result);
 
-    // Here you would typically make an API call to update the business data
+      if (result.success) {
+        // Update local state and show success modal
+        setBusinessFormData(updatedData);
+        setIsEditModalOpen(false);
+        setIsEditSuccessModalOpen(true);
+        
+        // Refresh business details
+        getBusinessById(businessId);
+      } else {
+        // Show failure modal
+        setIsEditModalOpen(false);
+        setIsEditFailureModalOpen(true);
+      }
+    } catch (error) {
+      console.error("Error updating business:", error);
+      setIsEditModalOpen(false);
+      setIsEditFailureModalOpen(true);
+    }
   };
 
   // Format the date string
@@ -251,6 +429,81 @@ export default function Page(): React.ReactElement {
       },
     ];
   };
+
+  // Handle document click for preview
+  const handleDocumentClick = (doc: Document): void => {
+    setPreviewDoc(doc);
+    setIsPreviewOpen(true);
+  };
+  
+  // Close document preview
+  const closePreview = (): void => {
+    setIsPreviewOpen(false);
+  };
+
+  // Process business photos as documents
+  const mapBusinessPhotosToDocuments = (): Document[] => {
+    if (!dealRoomDetails?.businessPhotos || dealRoomDetails.businessPhotos.length === 0) {
+      return [];
+    }
+    
+    return dealRoomDetails.businessPhotos.map((photoUrl, index) => {
+      // Determine file type from URL or default to JPG
+      const fileType = photoUrl.toLowerCase().endsWith('.png') ? 'PNG' : 'JPG';
+      
+      return {
+        id: `photo-${index}`,
+        title: `Business Photo ${index + 1}`,
+        fileType,
+        fileSize: "2.5 MB", // Placeholder size
+        downloadUrl: photoUrl,
+        date: dealRoomDetails.updatedAt
+      };
+    });
+  };
+
+  // Process business documents as documents
+  const mapBusinessDocumentsToDocuments = (): Document[] => {
+    if (!dealRoomDetails?.businessDocuments || dealRoomDetails.businessDocuments.length === 0) {
+      return [];
+    }
+    
+    return dealRoomDetails.businessDocuments.map((docUrl, index) => {
+      // Determine file type from URL or default to PDF
+      const fileType = docUrl.toLowerCase().endsWith('.png') ? 'PNG' : 
+                      docUrl.toLowerCase().endsWith('.jpg') || docUrl.toLowerCase().endsWith('.jpeg') ? 'JPG' : 'PDF';
+      
+      return {
+        id: `doc-${index}`,
+        title: `Business Document ${index + 1}`,
+        fileType,
+        fileSize: "3.2 MB", // Placeholder size
+        downloadUrl: docUrl,
+        date: dealRoomDetails.updatedAt
+      };
+    });
+  };
+
+  // Process proof of business as document
+  const mapProofOfBusinessToDocument = (): Document[] => {
+    if (!dealRoomDetails?.proofOfBusiness) {
+      return [];
+    }
+    
+    // Determine file type from URL or default to PDF
+    const fileType = dealRoomDetails.proofOfBusiness.toLowerCase().endsWith('.png') ? 'PNG' : 
+                    dealRoomDetails.proofOfBusiness.toLowerCase().endsWith('.jpg') || 
+                    dealRoomDetails.proofOfBusiness.toLowerCase().endsWith('.jpeg') ? 'JPG' : 'PDF';
+    
+    return [{
+      id: 'proof-of-business',
+      title: 'Proof of Business',
+      fileType,
+      fileSize: "4.1 MB", // Placeholder size
+      downloadUrl: dealRoomDetails.proofOfBusiness,
+      date: dealRoomDetails.updatedAt
+    }];
+  };
   
   // Always show loading indicator when loading is true
   if (loading) {
@@ -279,6 +532,11 @@ export default function Page(): React.ReactElement {
   if (!hasAttemptedFetch) {
     return <Loading isVisible={true}/>;
   }
+
+  // Combine all documents for the new documents section
+  const businessPhotos = mapBusinessPhotosToDocuments();
+  const businessDocuments = mapBusinessDocumentsToDocuments();
+  const proofOfBusiness = mapProofOfBusinessToDocument();
   
   return (
     <div className="px-6 ml-[20%]">
@@ -332,8 +590,9 @@ export default function Page(): React.ReactElement {
           <button
             className="border px-4 py-2 border-black rounded"
             onClick={() => setIsEditModalOpen(true)}
+            disabled={editing}
           >
-            Edit
+            {editing ? "Updating..." : "Edit"}
           </button>
         </div>
       </div>
@@ -373,7 +632,7 @@ export default function Page(): React.ReactElement {
           <div className="flex gap-2 text-xs">
             <button>
               <Link 
-                href={`/dashboard/users/details/business-details/fundability-details?id=${businessId}`} 
+                href={`/dashboard/businesses/business-details/fundability-details?id=${businessId}`} 
                 className="border-mainGray border rounded py-2 px-4"
               >
                 View Fundability Details
@@ -390,197 +649,290 @@ export default function Page(): React.ReactElement {
           </div>
         </div>
       </div>
+
+      {/* Add business documents section here */}
       <div className="mt-10 mb-10">
-        <p className="font-semibold items-center flex gap-2">
-          <Image
-            src="/valuation.svg"
-            alt="Valuation"
-            width={20}
-            height={20}
-            className="object-cover"
-          />{" "}
-          Valuation
+        <p className="font-semibold items-center mb-5 flex gap-2">
+          <File size={20} />
+          Business Documents
         </p>
-        <p className="text-mainGray text-sm mb-5">
-          Prepared {formatDate(businessDetails?.updatedAt || "today")}
-        </p>
-      </div>
-      <div className="px-5 py-5 border border-gray-200 rounded-xl">
-        <p className="text-mainGreen font-medium mb-4">Valuation Summary</p>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        
+        {/* Proof of Business Section */}
+        {proofOfBusiness.length > 0 && (
+          <div className="mb-8">
+            <h3 className="text-mainGreen font-medium mb-4">Proof of Business</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {proofOfBusiness.map((doc) => (
+                <div 
+                  key={doc.id} 
+                  onClick={() => handleDocumentClick(doc)}
+                  className="cursor-pointer hover:shadow-md transition-shadow duration-200"
+                  role="button"
+                  aria-label={`View ${doc.title}`}
+                  tabIndex={0}
+                >
+                  <DocumentCard document={doc} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Business Documents Section */}
+        {businessDocuments.length > 0 && (
+          <div className="mb-8">
+            <h3 className="text-mainGreen font-medium mb-4">Business Documents</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {businessDocuments.map((doc) => (
+                <div 
+                  key={doc.id} 
+                  onClick={() => handleDocumentClick(doc)}
+                  className="cursor-pointer hover:shadow-md transition-shadow duration-200"
+                  role="button"
+                  aria-label={`View ${doc.title}`}
+                  tabIndex={0}
+                >
+                  <DocumentCard document={doc} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Business Photos Section */}
+        {businessPhotos.length > 0 && (
           <div>
-            <p className="text-gray-600 text-sm mb-1">Valuation Range</p>
-            <p className="font-medium text-xs">
-              {dealRoomDetails?.tentativeSellingPrice ? 
-                `₦ ${(dealRoomDetails.tentativeSellingPrice * 0.8).toLocaleString()} - ₦ ${(dealRoomDetails.tentativeSellingPrice * 1.2).toLocaleString()}` : 
-                "Not Available"}
-            </p>
-          </div>
+            <h3 className="text-mainGreen font-medium mb-4">Business Photos</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {businessPhotos.map((doc) => (
+               <div 
+               key={doc.id} 
+               onClick={() => handleDocumentClick(doc)}
+               className="cursor-pointer hover:shadow-md transition-shadow duration-200"
+               role="button"
+               aria-label={`View ${doc.title}`}
+               tabIndex={0}
+             >
+               <DocumentCard document={doc} />
+             </div>
+           ))}
+         </div>
+       </div>
+     )}
+     
+     {/* Show message when no documents are available */}
+     {proofOfBusiness.length === 0 && businessDocuments.length === 0 && businessPhotos.length === 0 && (
+       <div className="text-center py-8 border border-gray-200 rounded">
+         <p className="text-gray-500">No business documents available</p>
+       </div>
+     )}
+   </div>
 
-          <div>
-            <p className="text-gray-600 text-sm mb-1">
-              Current Fundability Score
-            </p>
-            <p className="font-medium text-xs">{fundabilityDetails?.score || 0}%</p>
-          </div>
+   <div className="mt-10 mb-10">
+     <p className="font-semibold items-center flex gap-2">
+       <Image
+         src="/valuation.svg"
+         alt="Valuation"
+         width={20}
+         height={20}
+         className="object-cover"
+       />{" "}
+       Valuation
+     </p>
+     <p className="text-mainGray text-sm mb-5">
+       Prepared {formatDate(businessDetails?.updatedAt || "today")}
+     </p>
+   </div>
+   <div className="px-5 py-5 border border-gray-200 rounded-xl">
+     <p className="text-mainGreen font-medium mb-4">Valuation Summary</p>
 
-          <div>
-            <p className="text-gray-600 text-sm mb-1">Investment potential</p>
-            <p className="font-medium text-xs">
-              {fundabilityDetails?.score && fundabilityDetails.score > 70 ? "High Growth Potential" : 
-               fundabilityDetails?.score && fundabilityDetails.score > 50 ? "Moderate Growth Potential" : 
-               "Low Growth Potential"}
-            </p>
-          </div>
-        </div>
+     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+       <div>
+         <p className="text-gray-600 text-sm mb-1">Valuation Range</p>
+         <p className="font-medium text-xs">
+           {dealRoomDetails?.tentativeSellingPrice ? 
+             `₦ ${(dealRoomDetails.tentativeSellingPrice * 0.8).toLocaleString()} - ₦ ${(dealRoomDetails.tentativeSellingPrice * 1.2).toLocaleString()}` : 
+             "Not Available"}
+         </p>
+       </div>
 
-        <div className="border-t border-gray-200 pt-6">
-          <p className="text-mainGreen font-medium mb-4">
-            Key Valuation Metrics
-          </p>
+       <div>
+         <p className="text-gray-600 text-sm mb-1">
+           Current Fundability Score
+         </p>
+         <p className="font-medium text-xs">{fundabilityDetails?.score || 0}%</p>
+       </div>
 
-      
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-3">
-            <div>
-              <p className="text-gray-600 text-sm mb-1">Annual Revenue</p>
-              <p className="font-medium text-xs">
-                {dealRoomDetails?.reportedYearlySales ? 
-                  `₦ ${dealRoomDetails.reportedYearlySales.toLocaleString()}` : 
-                  fundabilityDetails?.averageAnnualRevenue ? 
-                  `₦ ${fundabilityDetails.averageAnnualRevenue.toLocaleString()}` : 
-                  "Not Available"}
-              </p>
-            </div>
+       <div>
+         <p className="text-gray-600 text-sm mb-1">Investment potential</p>
+         <p className="font-medium text-xs">
+           {fundabilityDetails?.score && fundabilityDetails.score > 70 ? "High Growth Potential" : 
+            fundabilityDetails?.score && fundabilityDetails.score > 50 ? "Moderate Growth Potential" : 
+            "Low Growth Potential"}
+         </p>
+       </div>
+     </div>
 
-            <div>
-              <p className="text-gray-600 text-sm mb-1">EBITDA</p>
-              <p className="font-medium text-xs">
-                {dealRoomDetails?.averageMonthlySales ? 
-                  `₦ ${(dealRoomDetails.averageMonthlySales * 12 * (dealRoomDetails.profitMarginPercentage / 100)).toLocaleString()}` : 
-                  "Not Available"}
-              </p>
-            </div>
+     <div className="border-t border-gray-200 pt-6">
+       <p className="text-mainGreen font-medium mb-4">
+         Key Valuation Metrics
+       </p>
 
-            <div>
-              <p className="text-gray-600 text-sm mb-1">Net Profit Margin</p>
-              <p className="font-medium text-xs">
-                {dealRoomDetails?.profitMarginPercentage ? 
-                  `${dealRoomDetails.profitMarginPercentage}%` : 
-                  "Not Available"}
-              </p>
-            </div>
-          </div>
+   
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-3">
+         <div>
+           <p className="text-gray-600 text-sm mb-1">Annual Revenue</p>
+           <p className="font-medium text-xs">
+             {dealRoomDetails?.reportedYearlySales ? 
+               `₦ ${dealRoomDetails.reportedYearlySales.toLocaleString()}` : 
+               fundabilityDetails?.averageAnnualRevenue ? 
+               `₦ ${fundabilityDetails.averageAnnualRevenue.toLocaleString()}` : 
+               "Not Available"}
+           </p>
+         </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <p className="text-gray-600 text-sm mb-1">Growth Rate</p>
-              <p className="font-medium text-xs">
-                {fundabilityDetails?.revenueGrowthRate ? 
-                  `${fundabilityDetails.revenueGrowthRate}%` : 
-                  "Not Available"}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div>
-        <div className="my-10">
-          <p className="font-semibold flex gap-1 items-center mb-5">
-            <Image
-              src="/business.svg"
-              alt="Proposals"
-              width={20}
-              height={20}
-              className="object-cover"
-            />{" "}
-            Proposals Sent
-          </p>
-          {dealRoomDetails?.proposalDetails && dealRoomDetails.proposalDetails.length > 0 ? (
-            <Table>
-              <TableHead>
-                <TableRow className="bg-gray-100">
-                  <TableHeader>Date</TableHeader>
-                  <TableHeader>Investor</TableHeader>
-                  <TableHeader>Industry</TableHeader>
-                  <TableHeader>Email</TableHeader>
-                  <TableHeader>Proposed Amount</TableHeader>
-                  <TableHeader>Status</TableHeader>
-                </TableRow>
-              </TableHead>
+         <div>
+           <p className="text-gray-600 text-sm mb-1">EBITDA</p>
+           <p className="font-medium text-xs">
+             {dealRoomDetails?.averageMonthlySales ? 
+               `₦ ${(dealRoomDetails.averageMonthlySales * 12 * (dealRoomDetails.profitMarginPercentage / 100)).toLocaleString()}` : 
+               "Not Available"}
+           </p>
+         </div>
 
-              <TableBody>
-                {dealRoomDetails.proposalDetails.map((proposal: any, index: number) => (
-                  <TableRow key={index} link={`/dashboard/users/details/business-details/proposals?id=${proposal.id}`}>
-                    <TableCell>{formatDate(proposal.createdAt || '')}</TableCell>
-                    <TableCell>{proposal.investorName || 'Unknown'}</TableCell>
-                    <TableCell>{proposal.industry || 'N/A'}</TableCell>
-                    <TableCell>{proposal.email || 'N/A'}</TableCell>
-                    <TableCell>{proposal.amount ? `₦${proposal.amount.toLocaleString()}` : 'N/A'}</TableCell>
-                    <TableCell>
-                      <StatusBadge2 status={proposal.status || 'Pending'} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-8 border border-gray-200 rounded">
-              <p className="text-gray-500">No proposals available</p>
-            </div>
-          )}
-        </div>
-      </div>
-      <EditBusinessModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        businessData={businessFormData}
-        onUpdate={handleUpdate}
-      />
-      <UpdateFundabilityScoreModal
-        isOpen={isEditFundabilityModalOpen}
-        onClose={() => setIsEditFundabilityModalOpen(false)}
-        currentScore={fundabilityDetails?.score || 0}
-        onUpdateScore={handleUpdateScore}
-      />
-      <EditUserSuccessModal
-        title="Edit Business"
-        isOpen={isEditSuccessModalOpen}
-        text="Business information updated successfully."
-        onClose={() => setIsEditSuccessModalOpen(false)}
-      />
-      <EditUserFailureModal
-        isOpen={isEditFailureModalOpen}
-        onClose={() => setIsEditFailureModalOpen(false)}
-        onRetry={handleRetryEdit}
-      />
-      <UpdateScoreSuccessModal
-        isOpen={isSuccessModalOpen}
-        onClose={() => setIsSuccessModalOpen(false)}
-        newScore={updatedScore}
-        reason={updateReason}
-      />
-      <SuspendUserFailureModal
-        isOpen={isSuspendFailureModalOpen}
-        onClose={() => setIsSuspendFailureModalOpen(false)}
-        onRetry={handleRetrySuspend}
-      />
-      
-      {/* New Verify Business Modal */}
-      <VerifyBusinessModal
-        isOpen={isVerifyModalOpen}
-        onClose={() => setIsVerifyModalOpen(false)}
-        onConfirm={handleVerifyBusiness}
-        businessName={businessDetails?.businessName || "test"}
-        isVerifying={verifying}
-      />
-      
-      {/* New Verify Success Modal */}
-      <VerifyBusinessSuccessModal
-        isOpen={isVerifySuccessModalOpen}
-        onClose={() => setIsVerifySuccessModalOpen(false)}
-        businessName={businessDetails?.businessName || "test"}
-      />
-    </div>
-  );
+         <div>
+           <p className="text-gray-600 text-sm mb-1">Net Profit Margin</p>
+           <p className="font-medium text-xs">
+             {dealRoomDetails?.profitMarginPercentage ? 
+               `${dealRoomDetails.profitMarginPercentage}%` : 
+               "Not Available"}
+           </p>
+         </div>
+       </div>
+
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+         <div>
+           <p className="text-gray-600 text-sm mb-1">Growth Rate</p>
+           <p className="font-medium text-xs">
+             {fundabilityDetails?.revenueGrowthRate ? 
+               `${fundabilityDetails.revenueGrowthRate}%` : 
+               "Not Available"}
+           </p>
+         </div>
+       </div>
+     </div>
+   </div>
+   <div>
+     <div className="my-10">
+       <p className="font-semibold flex gap-1 items-center mb-5">
+         <Image
+           src="/business.svg"
+           alt="Proposals"
+           width={20}
+           height={20}
+           className="object-cover"
+         />{" "}
+         Proposals Sent
+       </p>
+       {dealRoomDetails?.proposalDetails && dealRoomDetails.proposalDetails.length > 0 ? (
+         <Table>
+           <TableHead>
+             <TableRow className="bg-gray-100">
+               <TableHeader>Date</TableHeader>
+               <TableHeader>Investor</TableHeader>
+               <TableHeader>Industry</TableHeader>
+               <TableHeader>Email</TableHeader>
+               <TableHeader>Proposed Amount</TableHeader>
+               <TableHeader>Status</TableHeader>
+             </TableRow>
+           </TableHead>
+
+           <TableBody>
+             {dealRoomDetails.proposalDetails.map((proposal: any, index: number) => (
+               <TableRow key={index} link={`/dashboard/businesses/business-details/proposals?id=${proposal.id}`}>
+                 <TableCell>{formatDate(proposal.createdAt || '')}</TableCell>
+                 <TableCell>{proposal.investorName || 'Unknown'}</TableCell>
+                 <TableCell>{proposal.industry || 'N/A'}</TableCell>
+                 <TableCell>{proposal.email || 'N/A'}</TableCell>
+                 <TableCell>{proposal.amount ? `₦${proposal.amount.toLocaleString()}` : 'N/A'}</TableCell>
+                 <TableCell><StatusBadge2 status={proposal.status || 'Pending'} />
+                 </TableCell>
+               </TableRow>
+             ))}
+           </TableBody>
+         </Table>
+       ) : (
+         <div className="text-center py-8 border border-gray-200 rounded">
+           <p className="text-gray-500">No proposals available</p>
+         </div>
+       )}
+     </div>
+   </div>
+   
+   {/* Edit Business Modal with fixed prop types */}
+   <EditBusinessModal
+     isOpen={isEditModalOpen}
+     onClose={() => setIsEditModalOpen(false)}
+     businessData={businessFormData}
+     businessId={businessId}
+     onUpdate={handleUpdate}
+   />
+   
+   <UpdateFundabilityScoreModal
+     isOpen={isEditFundabilityModalOpen}
+     onClose={() => setIsEditFundabilityModalOpen(false)}
+     currentScore={fundabilityDetails?.score || 0}
+     onUpdateScore={handleUpdateScore}
+   />
+   
+   <EditUserSuccessModal
+     title="Edit Business"
+     isOpen={isEditSuccessModalOpen}
+     text="Business information updated successfully."
+     onClose={() => setIsEditSuccessModalOpen(false)}
+   />
+   
+   <EditUserFailureModal
+     isOpen={isEditFailureModalOpen}
+     onClose={() => setIsEditFailureModalOpen(false)}
+     onRetry={handleRetryEdit}
+   />
+   
+   <UpdateScoreSuccessModal
+     isOpen={isSuccessModalOpen}
+     onClose={() => setIsSuccessModalOpen(false)}
+     newScore={updatedScore}
+     reason={updateReason}
+   />
+   
+   <SuspendUserFailureModal
+     isOpen={isSuspendFailureModalOpen}
+     onClose={() => setIsSuspendFailureModalOpen(false)}
+     onRetry={handleRetrySuspend}
+   />
+   
+   {/* Verify Business Modal */}
+   <VerifyBusinessModal
+     isOpen={isVerifyModalOpen}
+     onClose={() => setIsVerifyModalOpen(false)}
+     onConfirm={handleVerifyBusiness}
+     businessName={businessDetails?.businessName || "test"}
+     isVerifying={verifying}
+   />
+   
+   {/* Verify Success Modal */}
+   <VerifyBusinessSuccessModal
+     isOpen={isVerifySuccessModalOpen}
+     onClose={() => setIsVerifySuccessModalOpen(false)}
+     businessName={businessDetails?.businessName || "test"}
+   />
+
+   {/* Document Preview Modal */}
+   <DocumentPreviewModal 
+     isOpen={isPreviewOpen} 
+     onClose={closePreview} 
+     document={previewDoc} 
+   />
+ </div>
+);
 }
