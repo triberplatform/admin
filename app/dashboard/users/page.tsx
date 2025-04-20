@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import Header from "@/app/components/Header";
 import {
   Table,
@@ -41,13 +41,30 @@ export default function UsersPage(): React.ReactElement {
   // When search is active, only show search results. Otherwise show regular users.
   const displayUsers = isSearchActive ? searchResults : users;
   
+  // Fix: Memoize the handleSearch function with useCallback
+  const handleSearch = useCallback(async () => {
+    if (query.trim()) {
+      await searchUsers(query);
+      console.log("Search results:", searchResults);
+      // Activate search mode when we have results
+      setIsSearchActive(true);
+    }
+  }, [query, searchUsers, setIsSearchActive]);
+  
+  // Handle clear with useCallback too for consistency
+  const handleClear = useCallback(() => {
+    setQuery("");
+    clearSearch();
+    setIsSearchActive(false);
+  }, [clearSearch, setIsSearchActive]);
+  
   useEffect(() => {
     if (!isSearchActive) {
       getUsers(currentPage, itemsPerPage);
     }
   }, [getUsers, currentPage, itemsPerPage, isSearchActive]);
   
-  // Handle search with debounce
+  // Fix: Add the missing dependencies to the useEffect's dependency array
   useEffect(() => {
     // Debounce search function
     if (query.trim()) {
@@ -68,27 +85,12 @@ export default function UsersPage(): React.ReactElement {
         clearTimeout(searchTimeout.current);
       }
     };
-  }, [query]);
+  }, [query, handleSearch, clearSearch, setIsSearchActive]);
   
   // Log search results whenever they change
   useEffect(() => {
     console.log("Current search results:", searchResults);
   }, [searchResults]);
-  
-  const handleSearch = async () => {
-    if (query.trim()) {
-      await searchUsers(query);
-      console.log("Search results:", searchResults);
-      // Activate search mode when we have results
-      setIsSearchActive(true);
-    }
-  };
-
-  const handleClear = () => {
-    setQuery("");
-    clearSearch();
-    setIsSearchActive(false);
-  };
   
   const handleDelete = async (publicId: string): Promise<void> => {
     if (confirm("Are you sure you want to delete this user?")) {

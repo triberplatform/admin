@@ -142,6 +142,9 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
   );
 };
 
+// Fix 1: Define handleSearch outside the component or use useCallback
+// Fix 2: Add clearSearch and handleSearch to the dependency array
+
 export default function BusinessesPage() {
   const { 
     businesses, 
@@ -173,6 +176,16 @@ export default function BusinessesPage() {
   // Determine which businesses data to show based on whether search is active
   const displayBusinesses = isSearchActive ? searchResults : businesses;
 
+  // Fix: Use useCallback to memoize the handleSearch function
+  const handleSearch = React.useCallback(async () => {
+    if (query.trim()) {
+      await searchBusinesses(query);
+      console.log("Search results:", searchResults);
+      // Activate search mode when search is executed
+      setIsSearchActive(true);
+    }
+  }, [query, searchBusinesses, setIsSearchActive]); // Add all dependencies
+
   // Fetch businesses on component mount and when pagination changes
   useEffect(() => {
     if (!isSearchActive) {
@@ -180,7 +193,7 @@ export default function BusinessesPage() {
     }
   }, [getBusinesses, currentPage, itemsPerPage, isSearchActive]);
   
-  // Handle search with debounce
+  // Handle search with debounce - Fix: Add the missing dependencies
   useEffect(() => {
     // Debounce search function
     if (query.trim()) {
@@ -201,27 +214,20 @@ export default function BusinessesPage() {
         clearTimeout(searchTimeout.current);
       }
     };
-  }, [query]);
+  }, [query, handleSearch, clearSearch, setIsSearchActive]); // Added missing dependencies
   
   // Log search results whenever they change
   useEffect(() => {
     console.log("Current business search results:", searchResults);
   }, [searchResults]);
 
-  const handleSearch = async () => {
-    if (query.trim()) {
-      await searchBusinesses(query);
-      console.log("Search results:", searchResults);
-      // Activate search mode when search is executed
-      setIsSearchActive(true);
-    }
-  };
-
   const handleClear = () => {
     setQuery("");
     clearSearch();
     setIsSearchActive(false);
   };
+
+
 
   // Handle delete button click
   const handleDeleteClick = (business: BusinessData) => {
