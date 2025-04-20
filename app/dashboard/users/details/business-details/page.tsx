@@ -36,6 +36,8 @@ const imageLoader = ({src}:any) => {
   return `${src}`;
 }
 
+
+
 // Type definition for business form data with optional fields
 interface BusinessData {
   businessName: string;
