@@ -17,8 +17,8 @@ export default function SideNav() {
     { name: 'Overview', href: '/dashboard', icon: Grid },
     { name: 'Users', href: '/dashboard/users', icon: Users },
     { name: 'Businesses', href: '/dashboard/businesses', icon: Briefcase },
+    { name: 'Investors', href: '/dashboard/investors', icon: Handshake },
     { name: 'Fundability Tests', href: '/dashboard/fundability-tests', icon: TestTube },
-    // { name: 'Deals', href: '/deals', icon: Handshake }
   ];
 
   const bottomNavItems = [

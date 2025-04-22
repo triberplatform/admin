@@ -125,7 +125,7 @@ export default function Home() {
               title="Investors"
               count={dataCount?.investorsCount || 0}
               icon={Briefcase}
-              viewAllLink="/dashboard"
+              viewAllLink="/dashboard/investors"
               color="purple-500"
             />
           </div>

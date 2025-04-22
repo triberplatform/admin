@@ -99,6 +99,18 @@ apiClient.interceptors.response.use(
       sessionStorage.setItem('auth_redirected', 'true');
       
       // Redirect to login
+      // window.location.href = '/';
+    }
+    if (error.response?.status === 403) {
+      console.error('Unauthorized request, redirecting to login');
+      
+      // Completely clear auth state
+      clearAuth();
+      
+      // Set a flag to indicate we're being redirected due to auth error
+      sessionStorage.setItem('auth_redirected', 'true');
+      
+      // Redirect to login
       window.location.href = '/';
     }
     

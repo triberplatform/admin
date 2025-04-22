@@ -574,3 +574,34 @@ export interface FundabilityTestStartup {
   updatedAt: string;
  
 }
+
+
+export interface Investor {
+  id: number;
+  publicId: string;
+  userId: number;
+  email: string;
+  phoneNumber: string | null;
+  companyName: string;
+  about: string;
+  companyLogoUrl: string;
+  companyWebsiteUrl: string;
+  termsOfAgreementDocUrl: string;
+  proofOfBusinessDocUrl: string;
+  location: string;
+  interestedLocations: string; // JSON string of locations
+  designation: string;
+  numOfExpectedDeals:string;
+  companyType: string;
+  interestedFactors: string; // JSON string of factors
+  fundsUnderManagement: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// API response interface
+export interface InvestorApiResponse {
+  success: boolean;
+  message: string;
+  data: Investor[];
+}
