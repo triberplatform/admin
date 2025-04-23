@@ -605,3 +605,118 @@ export interface InvestorApiResponse {
   message: string;
   data: Investor[];
 }
+
+
+
+
+
+// Define the Investor interface
+interface InvestorSent {
+  companyName: string;
+  email: string;
+  companyLogoUrl: string;
+}
+
+// Define the Proposal interface
+interface ProposalSentBusiness {
+  id: number;
+  publicId: string;
+  businessId: string;
+  investorId: string;
+  buyingPrice: number | null;
+  sellingPrice: string; // Note: This appears as a string in the JSON
+  fundingAmount: number | null;
+  dealRoomBusinessId: string | null;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED'; // Assuming these are the possible statuses
+  proposal: string;
+  createdAt: string;
+  updatedAt: string;
+  investor: Investor;
+}
+
+// Define the response interface for Business Proposals
+interface BusinessProposalsResponse {
+  success: boolean;
+  message: string;
+  data: ProposalSentBusiness[];
+}
+
+export type { InvestorSent, ProposalSentBusiness, BusinessProposalsResponse };
+
+export interface ProposalRecievedBusiness {
+  id: number;
+  publicId: string;
+  businessId: string;
+  investorId: string;
+  buyingPrice: string | null;
+  sellingPrice: string | null;
+  fundingAmount: string | null;
+  dealRoomBusinessId: string | null;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELED' | string;
+  proposal: string;
+  createdAt: string;
+  updatedAt: string;
+  investor: {
+    companyName: string;
+    email: string;
+    companyLogoUrl: string | null;
+  };
+}
+
+export interface ProposalsRecievedResponse {
+  success: boolean;
+  message: string;
+  data: ProposalRecievedBusiness[];
+}
+
+
+export interface BusinessInfo {
+  businessName: string;
+  businessEmail: string;
+  businessLogoUrl: string | null;
+}
+
+export interface InvestorProposalSent {
+  id: number;
+  publicId: string;
+  businessId: string;
+  investorId: string;
+  buyingPrice: string | null;
+  sellingPrice: string | null;
+  fundingAmount: string | null;
+  dealRoomBusinessId: string | null;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELED' | string;
+  proposal: string;
+  createdAt: string;
+  updatedAt: string;
+  business: BusinessInfo;
+}
+
+export interface InvestorProposalsSent {
+  success: boolean;
+  message: string;
+  data: InvestorProposalSent[];
+}
+
+
+export interface InvestorProposalReceived {
+  id: number;
+  publicId: string;
+  businessId: string;
+  investorId: string;
+  buyingPrice: string | null;
+  sellingPrice: string | null;
+  fundingAmount: string | null;
+  dealRoomBusinessId: string | null;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELED' | string;
+  proposal: string;
+  createdAt: string;
+  updatedAt: string;
+  business: BusinessInfo;
+}
+
+export interface InvestorProposalsReceived {
+  success: boolean;
+  message: string;
+  data: InvestorProposalReceived[];
+}

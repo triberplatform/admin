@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import apiClient from "../lib/api-client";
-import { ApiResponse, ApiResponseAll, BusinessData, DealRoomDetail, FundabilityTestDetail, Pagination, StartupTestDetails } from "../types/response";
+import { ApiResponse, ApiResponseAll, BusinessData, BusinessProposalsResponse, DealRoomDetail, FundabilityTestDetail, Pagination, ProposalRecievedBusiness, ProposalSentBusiness, ProposalsRecievedResponse, StartupTestDetails } from "../types/response";
 
 interface SearchPayload {
   query: string;
@@ -26,12 +26,16 @@ interface EditBusinessPayload {
 interface BusinessStoreState {
   businessDetails: BusinessData | null;
   businesses: BusinessData[];
+  proposals: ProposalSentBusiness[];
   searchResults: BusinessData[];
   pagination: Pagination | null;
   loading: boolean;
+  loadingProposals: boolean; // Separate loading state for proposals
   searching: boolean;
   editing: boolean;
   error: string | null;
+  errorProposals: string | null; // Separate error state for proposals
+  proposalsRecieved:ProposalRecievedBusiness[];
   message: string;
   success: boolean;
   fundabilityDetails: FundabilityTestDetail | null;
@@ -43,6 +47,8 @@ interface BusinessStoreState {
   deleteBusiness: (businessId: string) => Promise<void>;
   getBusinesses: (page?: number, limit?: number) => Promise<void>;
   getBusinessById: (id: string) => Promise<void>;
+  getProposalsSent: (id: string) => Promise<void>;
+  getProposalsRecieved: (id: string) => Promise<void>;
   verifyBusiness: (businessId: string) => Promise<{ message: string; success: boolean; }>;
   editBusiness: (businessId: string, data: EditBusinessPayload) => Promise<{ message: string; success: boolean; data?: BusinessData }>;
   searchBusinesses: (query: string) => Promise<void>;
@@ -52,19 +58,23 @@ interface BusinessStoreState {
 
 export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
   businesses: [],
+  proposalsRecieved:[],
   searchResults: [],
   pagination: null,
   loading: false,
+  loadingProposals: false,
   searching: false,
   verifying: false,
   editing: false,
   error: null,
+  errorProposals: null,
   message: "",
   success: false,
   fundabilityDetails: null,
   dealRoomDetails: null,
   businessDetails: null,
   startupTestDetails: null,
+  proposals: [],
   
   getBusinesses: async (page = 1, limit = 10) => {
     try {
@@ -172,6 +182,57 @@ export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
       });
     }
   },
+  
+  getProposalsSent: async (id: string) => {
+    try {
+      set({ loadingProposals: true, errorProposals: null });
+      
+      // Call the API endpoint with the id parameter in the URL path
+      const response = await apiClient.get<BusinessProposalsResponse>(`/business/proposals-sent/${id}`);
+      
+      set({
+        proposals: response.data.data,
+        loadingProposals: false,
+        message: response.data.message,
+        success: response.data.success
+      });
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || `Failed to fetch proposals for business with ID ${id}`;
+      
+      set({
+        errorProposals: errorMessage,
+        loadingProposals: false, 
+        message: errorMessage,
+        success: false
+      });
+    }
+  },
+
+  getProposalsRecieved: async (id: string) => {
+    try {
+      set({ loadingProposals: true, errorProposals: null });
+      
+      // Call the API endpoint with the id parameter in the URL path
+      const response = await apiClient.get<ProposalsRecievedResponse>(`/business/proposals-recieved/${id}`);
+      
+      set({
+        proposalsRecieved: response.data.data,
+        loadingProposals: false,
+        message: response.data.message,
+        success: response.data.success
+      });
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || `Failed to fetch proposals for business with ID ${id}`;
+      
+      set({
+        errorProposals: errorMessage,
+        loadingProposals: false, 
+        message: errorMessage,
+        success: false
+      });
+    }
+  },
+  
   
   deleteBusiness: async (publicId: string) => {
     try {
@@ -341,6 +402,6 @@ export const useBusinessStore = create<BusinessStoreState>((set, get) => ({
   },
   
   clearError: () => {
-    set({ error: null });
+    set({ error: null, errorProposals: null });
   }
 }));
