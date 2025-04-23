@@ -26,7 +26,7 @@ export async function GET(
     }
     
     // Forward request to backend with auth token and user ID
-    const businessData = await serverFetch(`/dealroom/investor/recieved-proposals/${userId}`, {
+    const businessData = await serverFetch(`/dealroom/investor/received-proposals/${userId}`, {
       method: 'GET',
       headers: {
         'Authorization': authHeader

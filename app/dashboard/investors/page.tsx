@@ -48,16 +48,7 @@ export default function InvestorsPage(): React.ReactElement {
     }
   };
 
-  // Format currency function
-  const formatCurrency = (amount: number | undefined): string => {
-    if (!amount && amount !== 0) return "-";
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
+
 
   // Fix: Memoize the handleSearch function with useCallback
   const handleSearch = useCallback(async () => {
@@ -249,7 +240,7 @@ export default function InvestorsPage(): React.ReactElement {
                     </span>
                   </TableCell>
                   <TableCell>{investor.location || "-"}</TableCell>
-                  <TableCell>{formatCurrency(investor.fundsUnderManagement)}</TableCell>
+                  <TableCell>₦{investor.fundsUnderManagement}</TableCell>
                   <TableCell>{formatDate(investor.createdAt)}</TableCell>
                   <TableCell>
                     <div className="flex gap-3">

@@ -145,16 +145,21 @@ const InvestorDetailsPage: React.FC = () => {
   const {
     investor,
     proposals,
+    proposalsReceived,
     loading,
     loadingProposals,
+    loadingProposalsReceived,
     error,
     errorProposals,
+    errorProposalsReceived,
     getInvestorById,
     getProposalsSent,
+    getProposalsReceived
   } = useInvestorStore();
 
-  // Use a ref to track if we've already fetched proposals for this investor ID
-  const proposalsFetchedRef = useRef<string | null>(null);
+  // Use refs to track if we've already fetched proposals for this investor ID
+  const proposalsSentFetchedRef = useRef<string | null>(null);
+  const proposalsReceivedFetchedRef = useRef<string | null>(null);
 
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
@@ -168,17 +173,29 @@ const InvestorDetailsPage: React.FC = () => {
     }
   }, [investorId, getInvestorById]);
 
-  // Load proposals data when investor details are loaded
+  // Load proposals sent data when investor details are loaded
   useEffect(() => {
     // Only fetch if investorId exists and we haven't fetched for this ID yet
-    if (investorId && proposalsFetchedRef.current !== investorId) {
+    if (investorId && proposalsSentFetchedRef.current !== investorId) {
       // Set the ref immediately to prevent multiple fetches
-      proposalsFetchedRef.current = investorId;
+      proposalsSentFetchedRef.current = investorId;
 
       // Get proposals sent
       getProposalsSent(investorId);
     }
   }, [investorId, getProposalsSent]);
+
+  // Load proposals received data when investor details are loaded
+  useEffect(() => {
+    // Only fetch if investorId exists and we haven't fetched for this ID yet
+    if (investorId && proposalsReceivedFetchedRef.current !== investorId) {
+      // Set the ref immediately to prevent multiple fetches
+      proposalsReceivedFetchedRef.current = investorId;
+
+      // Get proposals received
+      getProposalsReceived(investorId);
+    }
+  }, [investorId, getProposalsReceived]);
 
   const handleDocumentClick = (doc: Document): void => {
     setPreviewDoc(doc);
@@ -367,6 +384,76 @@ const InvestorDetailsPage: React.FC = () => {
     );
   };
 
+  // Render the proposals received table or a message if no proposals
+  const renderProposalsReceivedTable = () => {
+    if (loadingProposalsReceived) {
+      return (
+        <div className="text-center py-8 border border-gray-200 rounded">
+          <Loading isVisible={true} />
+        </div>
+      );
+    }
+
+    if (!proposalsReceived || proposalsReceived.length === 0) {
+      return (
+        <div className="text-center py-8 border border-gray-200 rounded">
+          <p className="text-gray-500">No proposals received</p>
+        </div>
+      );
+    }
+
+    return (
+      <Table>
+        <TableHead>
+          <TableRow className="bg-gray-100">
+            <TableHeader>Date</TableHeader>
+            <TableHeader>Business</TableHeader>
+            <TableHeader>Email</TableHeader>
+            <TableHeader>Selling Price</TableHeader>
+            <TableHeader>Proposal</TableHeader>
+            <TableHeader>Status</TableHeader>
+          </TableRow>
+        </TableHead>
+
+        <TableBody>
+          {proposalsReceived.map((proposal) => (
+            <TableRow
+              key={proposal.id}
+              link={`/dashboard/investors/investor-details/proposals-received?id=${proposal.publicId}`}
+            >
+              <TableCell>{formatTableDate(proposal.createdAt)}</TableCell>
+              <TableCell className="flex items-center gap-2">
+                {proposal.business?.businessLogoUrl ? (
+                  <Image
+                    src={proposal.business.businessLogoUrl}
+                    loader={imageLoader}
+                    width={24}
+                    height={24}
+                    className="object-cover rounded-full"
+                    alt={proposal.business.businessName}
+                  />
+                ) : null}
+                {proposal.business?.businessName || "Unknown"}
+              </TableCell>
+              <TableCell>{proposal.business?.businessEmail || "N/A"}</TableCell>
+              <TableCell>
+                {proposal.sellingPrice
+                  ? `₦${parseInt(proposal.sellingPrice).toLocaleString()}`
+                  : "N/A"}
+              </TableCell>
+              <TableCell className="max-w-[200px] truncate">
+                {proposal.proposal || "N/A"}
+              </TableCell>
+              <TableCell>
+                <StatusBadge4 status={proposal.status} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
   // Show loading indicator while data is being fetched
   if (loading) {
     return <Loading isVisible={loading} />;
@@ -489,12 +576,7 @@ const InvestorDetailsPage: React.FC = () => {
                 {
                   label: "Funds Under Management",
                   value: investor.fundsUnderManagement
-                    ? new Intl.NumberFormat("en-US", {
-                        style: "currency",
-                        currency: "USD",
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0,
-                      }).format(investor.fundsUnderManagement)
+                    ?  "₦" + investor.fundsUnderManagement
                     : "Not provided",
                 },
                 {
@@ -571,6 +653,27 @@ const InvestorDetailsPage: React.FC = () => {
           </div>
         ) : (
           renderProposalsSentTable()
+        )}
+      </div>
+
+      {/* Proposals Received Section */}
+      <div className="mt-10 mb-10">
+        <p className="font-semibold items-center mb-5 flex gap-2">
+          <Image
+            src="/business.svg"
+            alt="Proposals"
+            width={20}
+            height={20}
+            className="object-cover"
+          />{" "}
+          Proposals Received
+        </p>
+        {errorProposalsReceived ? (
+          <div className="text-center py-8 border border-gray-200 rounded">
+            <p className="text-red-500">Error: {errorProposalsReceived}</p>
+          </div>
+        ) : (
+          renderProposalsReceivedTable()
         )}
       </div>
 
