@@ -1,4 +1,8 @@
 "use client";
+import React, { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useBusinessStore } from '@/app/store/useBusinessStore';
+import { useFundabilityStore } from '@/app/store/useFundabilityStore';
 import Breadcrumb from "@/app/components/BreadCrumb";
 import CircularProgress2 from "@/app/components/CircularProgress2";
 import DocumentCard from "@/app/components/DocumentCard";
@@ -24,19 +28,16 @@ import {
 } from "@/app/components/Table";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
-import { useBusinessStore } from "@/app/store/useBusinessStore";
-import { useFundabilityStore } from "@/app/store/useFundabilityStore";
 import { format } from "date-fns";
 import { CheckCircle, BadgeCheck, File } from "lucide-react";
 import Loading from "@/app/loading";
+import { ProposalSentBusiness } from "@/app/types/response";
+import { StatusBadge3 } from '@/app/components/StatusBadge3';
+import { StatusBadge4 } from '@/app/components/StatusBadge4';
 
 const imageLoader = ({src}:any) => {
   return `${src}`;
 }
-
-
 
 // Type definition for business form data with optional fields
 interface BusinessData {
@@ -178,13 +179,21 @@ export default function Page(): React.ReactElement {
   // Add a state to track if initial data fetching has occurred
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState<boolean>(false);
   
+  // Use a ref to track if we've already fetched proposals for this business ID
+  const proposalsFetchedRef = useRef<string | null>(null);
+  
   const {
     businessDetails,
     fundabilityDetails,
     dealRoomDetails,
+    proposals,
+    proposalsRecieved,
     loading,
+    loadingProposals,
     error,
     getBusinessById,
+    getProposalsSent,
+    getProposalsRecieved,
     verifyBusiness,
     verifying,
     editBusiness,
@@ -234,6 +243,21 @@ export default function Page(): React.ReactElement {
         });
     }
   }, [businessId, getBusinessById]);
+
+  // Load proposals data when business details are loaded
+  useEffect(() => {
+    // Only fetch if businessId exists and we haven't fetched for this ID yet
+    if (businessId && proposalsFetchedRef.current !== businessId) {
+      // Set the ref immediately to prevent multiple fetches
+      proposalsFetchedRef.current = businessId;
+      
+      // Get proposals sent
+      getProposalsSent(businessId);
+      
+      // Get proposals received
+      getProposalsRecieved(businessId);
+    }
+  }, [businessId, getProposalsSent, getProposalsRecieved]);
 
   // Update local form data when business details are fetched
   useEffect(() => {
@@ -540,6 +564,124 @@ export default function Page(): React.ReactElement {
   const businessDocuments = mapBusinessDocumentsToDocuments();
   const proofOfBusiness = mapProofOfBusinessToDocument();
   
+  // Render the proposals table or a message if no proposals
+  const renderProposalsTable = () => {
+    if (loadingProposals) {
+      return (
+        <div className="text-center py-8 border border-gray-200 rounded">
+          <Loading isVisible={true} />
+        </div>
+      );
+    }
+    
+    if (!proposals || proposals.length === 0) {
+      return (
+        <div className="text-center py-8 border border-gray-200 rounded">
+          <p className="text-gray-500">No proposals available</p>
+        </div>
+      );
+    }
+    
+    return (
+      <Table>
+        <TableHead>
+          <TableRow className="bg-gray-100">
+            <TableHeader>Date</TableHeader>
+            <TableHeader>Investor</TableHeader>
+            <TableHeader>Email</TableHeader>
+            <TableHeader>Selling Price</TableHeader>
+            <TableHeader>Proposal</TableHeader>
+            <TableHeader>Status</TableHeader>
+          </TableRow>
+        </TableHead>
+
+        <TableBody>
+          {proposals.map((proposal: ProposalSentBusiness) => (
+            <TableRow key={proposal.id} link={`/dashboard/users/details/business-details/proposals-sent?id=${proposal.publicId}`}>
+              <TableCell>{formatDate(proposal.createdAt)}</TableCell>
+              <TableCell className="flex items-center gap-2">
+                {proposal.investor?.companyLogoUrl ? (
+                  <Image
+                    src={proposal.investor.companyLogoUrl}
+                    loader={imageLoader}
+                    width={24}
+                    height={24}
+                    className="object-cover rounded-full"
+                    alt={proposal.investor.companyName}
+                  />
+                ) : null}
+                {proposal.investor?.companyName || 'Unknown'}
+              </TableCell>
+              <TableCell>{proposal.investor?.email || 'N/A'}</TableCell>
+              <TableCell>{proposal.sellingPrice ? `₦${parseInt(proposal.sellingPrice).toLocaleString()}` : 'N/A'}</TableCell>
+              <TableCell className="max-w-[200px] truncate">{proposal.proposal || 'N/A'}</TableCell>
+              <TableCell><StatusBadge3 status={proposal.status} /></TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
+  // Render the proposals received table or a message if no proposals
+  const renderProposalsReceivedTable = () => {
+    if (loadingProposals) {
+      return (
+        <div className="text-center py-8 border border-gray-200 rounded">
+          <Loading isVisible={true} />
+        </div>
+      );
+    }
+    
+    if (!proposalsRecieved || proposalsRecieved.length === 0) {
+      return (
+        <div className="text-center py-8 border border-gray-200 rounded">
+          <p className="text-gray-500">No proposals received</p>
+        </div>
+      );
+    }
+    
+    return (
+      <Table>
+        <TableHead>
+          <TableRow className="bg-gray-100">
+            <TableHeader>Date</TableHeader>
+            <TableHeader>Investor</TableHeader>
+            <TableHeader>Email</TableHeader>
+            <TableHeader>Buying Price</TableHeader>
+            <TableHeader>Proposal</TableHeader>
+            <TableHeader>Status</TableHeader>
+          </TableRow>
+        </TableHead>
+
+        <TableBody>
+          {proposalsRecieved.map((proposal) => (
+            <TableRow key={proposal.id} link={`/dashboard/users/details/business-details/proposals-received?id=${proposal.publicId}`}>
+              <TableCell>{formatDate(proposal.createdAt)}</TableCell>
+              <TableCell className="flex items-center gap-2">
+                {proposal.investor?.companyLogoUrl ? (
+                  <Image
+                    src={proposal.investor.companyLogoUrl}
+                    loader={imageLoader}
+                    width={24}
+                    height={24}
+                    className="object-cover rounded-full"
+                    alt={proposal.investor.companyName}
+                  />
+                ) : null}
+                {proposal.investor?.companyName || 'Unknown'}
+              </TableCell>
+              <TableCell>{proposal.investor?.email || 'N/A'}</TableCell>
+              <TableCell>{proposal.buyingPrice ? `₦${parseInt(proposal.buyingPrice).toLocaleString()}` : 'N/A'}</TableCell>
+              <TableCell className="max-w-[200px] truncate">{proposal.proposal || 'N/A'}</TableCell>
+              <TableCell><StatusBadge4 status={proposal.status} /></TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+  
   return (
     <div className="px-6 ml-[20%]">
       <Header />
@@ -824,51 +966,35 @@ export default function Page(): React.ReactElement {
        </div>
      </div>
    </div>
-   <div>
-     <div className="my-10">
-       <p className="font-semibold flex gap-1 items-center mb-5">
-         <Image
-           src="/business.svg"
-           alt="Proposals"
-           width={20}
-           height={20}
-           className="object-cover"
-         />{" "}
-         Proposals Sent
-       </p>
-       {dealRoomDetails?.proposalDetails && dealRoomDetails.proposalDetails.length > 0 ? (
-         <Table>
-           <TableHead>
-             <TableRow className="bg-gray-100">
-               <TableHeader>Date</TableHeader>
-               <TableHeader>Investor</TableHeader>
-               <TableHeader>Industry</TableHeader>
-               <TableHeader>Email</TableHeader>
-               <TableHeader>Proposed Amount</TableHeader>
-               <TableHeader>Status</TableHeader>
-             </TableRow>
-           </TableHead>
-
-           <TableBody>
-             {dealRoomDetails.proposalDetails.map((proposal: any, index: number) => (
-               <TableRow key={index} link={`/dashboard/businesses/business-details/proposals?id=${proposal.id}`}>
-                 <TableCell>{formatDate(proposal.createdAt || '')}</TableCell>
-                 <TableCell>{proposal.investorName || 'Unknown'}</TableCell>
-                 <TableCell>{proposal.industry || 'N/A'}</TableCell>
-                 <TableCell>{proposal.email || 'N/A'}</TableCell>
-                 <TableCell>{proposal.amount ? `₦${proposal.amount.toLocaleString()}` : 'N/A'}</TableCell>
-                 <TableCell><StatusBadge2 status={proposal.status || 'Pending'} />
-                 </TableCell>
-               </TableRow>
-             ))}
-           </TableBody>
-         </Table>
-       ) : (
-         <div className="text-center py-8 border border-gray-200 rounded">
-           <p className="text-gray-500">No proposals available</p>
-         </div>
-       )}
-     </div>
+   
+   {/* Proposals Sent Section */}
+   <div className="my-10">
+     <p className="font-semibold flex gap-1 items-center mb-5">
+       <Image
+         src="/business.svg"
+         alt="Proposals"
+         width={20}
+         height={20}
+         className="object-cover"
+       />{" "}
+       Proposals Sent
+     </p>
+     {renderProposalsTable()}
+   </div>
+   
+   {/* Proposals Received Section */}
+   <div className="my-10">
+     <p className="font-semibold flex gap-1 items-center mb-5">
+       <Image
+         src="/business.svg"
+         alt="Proposals"
+         width={20}
+         height={20}
+         className="object-cover"
+       />{" "}
+       Proposals Received
+     </p>
+     {renderProposalsReceivedTable()}
    </div>
    
    {/* Edit Business Modal with fixed prop types */}

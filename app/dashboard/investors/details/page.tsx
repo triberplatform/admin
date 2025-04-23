@@ -349,7 +349,7 @@ const InvestorDetailsPage: React.FC = () => {
           {proposals.map((proposal) => (
             <TableRow
               key={proposal.id}
-              link={`/dashboard/investors/investor-details/proposals?id=${proposal.publicId}`}
+              link={`/dashboard/investors/details/proposals?id=${proposal.publicId}`}
             >
               <TableCell>{formatTableDate(proposal.createdAt)}</TableCell>
               <TableCell className="flex items-center gap-2">
@@ -419,7 +419,7 @@ const InvestorDetailsPage: React.FC = () => {
           {proposalsReceived.map((proposal) => (
             <TableRow
               key={proposal.id}
-              link={`/dashboard/investors/investor-details/proposals-received?id=${proposal.publicId}`}
+              link={`/dashboard/investors/details/proposals-received?id=${proposal.publicId}`}
             >
               <TableCell>{formatTableDate(proposal.createdAt)}</TableCell>
               <TableCell className="flex items-center gap-2">

@@ -597,7 +597,7 @@ export default function Page(): React.ReactElement {
 
         <TableBody>
           {proposals.map((proposal: ProposalSentBusiness) => (
-            <TableRow key={proposal.id} link={`/dashboard/businesses/business-details/proposals?id=${proposal.publicId}`}>
+            <TableRow key={proposal.id} link={`/dashboard/businesses/business-details/proposals-sent?id=${proposal.publicId}`}>
               <TableCell>{formatDate(proposal.createdAt)}</TableCell>
               <TableCell className="flex items-center gap-2">
                 {proposal.investor?.companyLogoUrl ? (
