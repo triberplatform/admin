@@ -18,3 +18,18 @@ export interface suspendPayload {
 export interface searchPayload {
     query: string;
   }
+
+
+  export interface EditBusinessDealRoomRPayload {
+    topSellingProducts: string[];
+    highlightsOfBusiness: string;
+    facilityDetails: string;
+    fundingDetails: string;
+    averageMonthlySales: string;
+    reportedYearlySales: string;
+    profitMarginPercentage: number;
+    assetsDetails: string[];
+    valueOfPhysicalAssets: string;
+    tentativeSellingPrice: string;
+    reasonForSale: string;
+}

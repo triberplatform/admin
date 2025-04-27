@@ -3,19 +3,27 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useBusinessStore } from '@/app/store/useBusinessStore';
 import { useFundabilityStore } from '@/app/store/useFundabilityStore';
+import { EditBusinessDealRoomRPayload } from '@/app/types/payload';
 import Breadcrumb from "@/app/components/BreadCrumb";
 import CircularProgress2 from "@/app/components/CircularProgress2";
 import DocumentCard from "@/app/components/DocumentCard";
 import EditBusinessModal from "@/app/components/Forms/EditBusiness";
+import EditDealRoomModal from '@/app/components/Forms/EditDealRoomProfile';
 import UpdateFundabilityScoreModal from "@/app/components/Forms/UpdateFundability";
+import SuspendBusinessModal from '@/app/components/Modals/SuspendBusinessModal';
 import Header from "@/app/components/Header";
 import { InfoGrid, InfoGridItem } from "@/app/components/infoGrid";
 import EditUserFailureModal from "@/app/components/Modals/EditUserFailure";
 import EditUserSuccessModal from "@/app/components/Modals/EditUserSuccess";
+import SuspendBusinessSuccessModal from '@/app/components/Modals/SuspendBusinessSuccessModal';
+import SuspendBusinessFailureModal from '@/app/components/Modals/SuspendBusinessFailureModal';
 import SuspendUserFailureModal from "@/app/components/Modals/SuspendUserFailure";
 import UpdateScoreSuccessModal from "@/app/components/Modals/UpdateFundabilityModal";
 import VerifyBusinessModal from "@/app/components/VerifyModal";
 import VerifyBusinessSuccessModal from "@/app/components/Modals/VerifyModalSuccess";
+import UnsuspendBusinessModal from '@/app/components/Modals/UnsuspendBusinessModal';
+import UnsuspendBusinessSuccessModal from '@/app/components/Modals/UnsuspendBusinessSuccessModal';
+import UnsuspendBusinessFailureModal from '@/app/components/Modals/UnsuspendBusinessFailureModal';
 import { StatusBadge } from "@/app/components/StatusBadge";
 import { StatusBadge2 } from "@/app/components/StatusBadge2";
 import {
@@ -35,9 +43,9 @@ import { ProposalSentBusiness } from "@/app/types/response";
 import { StatusBadge3 } from '@/app/components/StatusBadge3';
 import { StatusBadge4 } from '@/app/components/StatusBadge4';
 
-const imageLoader = ({src}:any) => {
+const imageLoader = ({ src }: { src: string }): string => {
   return `${src}`;
-}
+};
 
 // Type definition for business form data with optional fields
 interface BusinessData {
@@ -197,7 +205,12 @@ export default function Page(): React.ReactElement {
     verifyBusiness,
     verifying,
     editBusiness,
-    editing
+    editing,
+    editDealRoomProfile,
+    editingDealRoom,
+    suspendBusiness,
+    unsuspendBusiness,
+    suspending
   } = useBusinessStore();
 
   // Get the updateScore function from the fundability store
@@ -215,6 +228,18 @@ export default function Page(): React.ReactElement {
   const [updateReason, setUpdateReason] = useState<string>("");
   const [scoreHistory, setScoreHistory] = useState<ScoreHistoryItem[]>([]);
   const [updatedScore, setUpdatedScore] = useState<number>(0);
+  
+  // Deal Room edit state variables
+  const [isEditDealRoomModalOpen, setIsEditDealRoomModalOpen] = useState<boolean>(false);
+  const [isEditDealRoomSuccessModalOpen, setIsEditDealRoomSuccessModalOpen] = useState<boolean>(false);
+  const [isEditDealRoomFailureModalOpen, setIsEditDealRoomFailureModalOpen] = useState<boolean>(false);
+  
+  // Add state variables for suspension/unsuspension modals
+  const [isSuspendModalOpen, setIsSuspendModalOpen] = useState<boolean>(false);
+  const [isSuspendSuccessModalOpen, setIsSuspendSuccessModalOpen] = useState<boolean>(false);
+  const [isUnsuspendModalOpen, setIsUnsuspendModalOpen] = useState<boolean>(false);
+  const [isUnsuspendSuccessModalOpen, setIsUnsuspendSuccessModalOpen] = useState<boolean>(false);
+  const [isUnsuspendFailureModalOpen, setIsUnsuspendFailureModalOpen] = useState<boolean>(false);
   
   // Document preview states
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
@@ -298,6 +323,60 @@ export default function Page(): React.ReactElement {
     }
   }, [businessDetails, fundabilityDetails]);
 
+  // Handle business suspension
+  const handleSuspendBusiness = async (): Promise<void> => {
+    if (!businessDetails || !businessId) return;
+    
+    try {
+      // Call the suspendBusiness function from the store
+      const result = await suspendBusiness(businessId);
+      
+      // Close the suspend modal and show success modal if successful
+      if (result.success) {
+        setIsSuspendModalOpen(false);
+        setIsSuspendSuccessModalOpen(true);
+        
+        // Refresh business details
+        getBusinessById(businessId);
+      } else {
+        console.error('Suspension failed:', result.message);
+        setIsSuspendModalOpen(false);
+        setIsSuspendFailureModalOpen(true);
+      }
+    } catch (error) {
+      console.error('Error suspending business:', error);
+      setIsSuspendModalOpen(false);
+      setIsSuspendFailureModalOpen(true);
+    }
+  };
+
+  // Handle business unsuspension
+  const handleUnsuspendBusiness = async (): Promise<void> => {
+    if (!businessDetails || !businessId) return;
+    
+    try {
+      // Call the unsuspendBusiness function from the store
+      const result = await unsuspendBusiness(businessId);
+      
+      // Close the unsuspend modal and show success modal if successful
+      if (result.success) {
+        setIsUnsuspendModalOpen(false);
+        setIsUnsuspendSuccessModalOpen(true);
+        
+        // Refresh business details
+        getBusinessById(businessId);
+      } else {
+        console.error('Unsuspension failed:', result.message);
+        setIsUnsuspendModalOpen(false);
+        setIsUnsuspendFailureModalOpen(true);
+      }
+    } catch (error) {
+      console.error('Error unsuspending business:', error);
+      setIsUnsuspendModalOpen(false);
+      setIsUnsuspendFailureModalOpen(true);
+    }
+  };
+
   const handleRetryEdit = (): void => {
     setIsEditFailureModalOpen(false);
     setIsEditModalOpen(true);
@@ -306,6 +385,24 @@ export default function Page(): React.ReactElement {
   const handleRetrySuspend = (): void => {
     setIsSuspendFailureModalOpen(false);
     setIsEditFundabilityModalOpen(true);
+  };
+
+  // Handle retry for suspend business
+  const handleRetrySuspendBusiness = (): void => {
+    setIsSuspendFailureModalOpen(false);
+    setIsSuspendModalOpen(true);
+  };
+
+  // Handle retry for unsuspend business
+  const handleRetryUnsuspendBusiness = (): void => {
+    setIsUnsuspendFailureModalOpen(false);
+    setIsUnsuspendModalOpen(true);
+  };
+
+  // Handle retry for deal room edit
+  const handleRetryEditDealRoom = (): void => {
+    setIsEditDealRoomFailureModalOpen(false);
+    setIsEditDealRoomModalOpen(true);
   };
 
   const handleVerifyBusiness = async (): Promise<void> => {
@@ -376,7 +473,24 @@ export default function Page(): React.ReactElement {
   const handleUpdate = async (updatedData: BusinessData): Promise<void> => {
     try {
       // Create payload with only necessary fields
-      const payload: any = {
+      interface BusinessUpdatePayload {
+        businessName: string;
+        businessEmail: string;
+        businessPhone: string;
+        location: string;
+        industry: string;
+        businessLegalEntity: string;
+        description: string;
+        yearEstablished: number;
+        interestedIn?: string;
+        numOfEmployees?: string;
+        assets?: string;
+        reportedSales?: string;
+        businessStage?: string;
+        businessStatus?: string;
+      }
+      
+      const payload: BusinessUpdatePayload = {
         businessName: updatedData.businessName,
         businessEmail: updatedData.businessEmail,
         businessPhone: updatedData.businessPhone,
@@ -423,8 +537,38 @@ export default function Page(): React.ReactElement {
     }
   };
 
+  // Handle updating deal room profile
+  const handleUpdateDealRoom = async (data: EditBusinessDealRoomRPayload): Promise<void> => {
+    try {
+      // Log the payload for debugging
+      console.log("Update deal room payload:", data);
+      
+      // Update the deal room using the store
+      const result = await editDealRoomProfile(businessId, data);
+      
+      console.log("Update deal room result:", result);
+
+      if (result.success) {
+        // Show success modal
+        setIsEditDealRoomModalOpen(false);
+        setIsEditDealRoomSuccessModalOpen(true);
+        
+        // Refresh business details
+        getBusinessById(businessId);
+      } else {
+        // Show failure modal
+        setIsEditDealRoomModalOpen(false);
+        setIsEditDealRoomFailureModalOpen(true);
+      }
+    } catch (error) {
+      console.error("Error updating deal room:", error);
+      setIsEditDealRoomModalOpen(false);
+      setIsEditDealRoomFailureModalOpen(true);
+    }
+  };
+
   // Format the date string
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     try {
       return format(new Date(dateString), "dd MMM yyyy");
     } catch (error) {
@@ -450,6 +594,15 @@ export default function Page(): React.ReactElement {
           <div className="flex items-center">
             <span className={`w-4 h-4 rounded-full ${businessDetails.businessVerificationStatus ? "bg-green-500" : "bg-red-500"} mr-2`}></span>
             {businessDetails.businessVerificationStatus ? "Verified" : "Not Verified"}
+          </div>
+        ),
+      },
+      {
+        label: "Status",
+        value: (
+          <div className="flex items-center">
+            <span className={`w-4 h-4 rounded-full ${businessDetails.isSuspended ? "bg-red-500" : "bg-green-500"} mr-2`}></span>
+            {businessDetails.isSuspended ? "Suspended" : "Active"}
           </div>
         ),
       },
@@ -679,8 +832,9 @@ export default function Page(): React.ReactElement {
           ))}
         </TableBody>
       </Table>
-    );
+    ); 
   };
+
   
   return (
     <div className="px-6 ml-[20%]">
@@ -714,6 +868,11 @@ export default function Page(): React.ReactElement {
               {businessDetails?.businessVerificationStatus && (
                 <BadgeCheck size={20} className="text-green-500" />
               )}
+              {businessDetails?.isSuspended && (
+                <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+                  Suspended
+                </span>
+              )}
             </div>
             <p className="text-mainGray text-sm mt-1">
               <StatusBadge status={businessDetails?.businessStatus || "test"} />
@@ -729,6 +888,23 @@ export default function Page(): React.ReactElement {
             >
               <CheckCircle size={16} />
               {verifying ? "Verifying..." : "Verify Business"}
+            </button>
+          )}
+          {businessDetails?.isSuspended ? (
+            <button
+              className="text-white px-4 py-2 bg-green-500 rounded"
+              onClick={() => setIsUnsuspendModalOpen(true)}
+              disabled={suspending}
+            >
+              {suspending ? "Processing..." : "Unsuspend Business"}
+            </button>
+          ) : (
+            <button
+              className="text-white px-4 py-2 bg-red-500 rounded"
+              onClick={() => setIsSuspendModalOpen(true)}
+              disabled={suspending}
+            >
+              {suspending ? "Processing..." : "Suspend Business"}
             </button>
           )}
           <button
@@ -849,218 +1025,382 @@ export default function Page(): React.ReactElement {
             <h3 className="text-mainGreen font-medium mb-4">Business Photos</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {businessPhotos.map((doc) => (
-               <div 
-               key={doc.id} 
-               onClick={() => handleDocumentClick(doc)}
-               className="cursor-pointer hover:shadow-md transition-shadow duration-200"
-               role="button"
-               aria-label={`View ${doc.title}`}
-               tabIndex={0}
-             >
-               <DocumentCard document={doc} />
-             </div>
-           ))}
-         </div>
-       </div>
-     )}
-     
-     {/* Show message when no documents are available */}
-     {proofOfBusiness.length === 0 && businessDocuments.length === 0 && businessPhotos.length === 0 && (
-       <div className="text-center py-8 border border-gray-200 rounded">
-         <p className="text-gray-500">No business documents available</p>
-       </div>
-     )}
-   </div>
+                <div 
+                  key={doc.id} 
+                  onClick={() => handleDocumentClick(doc)}
+                  className="cursor-pointer hover:shadow-md transition-shadow duration-200"
+                  role="button"
+                  aria-label={`View ${doc.title}`}
+                  tabIndex={0}
+                >
+                  <DocumentCard document={doc} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Show message when no documents are available */}
+        {proofOfBusiness.length === 0 && businessDocuments.length === 0 && businessPhotos.length === 0 && (
+          <div className="text-center py-8 border border-gray-200 rounded">
+            <p className="text-gray-500">No business documents available</p>
+          </div>
+        )}
+      </div>
 
-   <div className="mt-10 mb-10">
-     <p className="font-semibold items-center flex gap-2">
-       <Image
-         src="/valuation.svg"
-         alt="Valuation"
-         width={20}
-         height={20}
-         className="object-cover"
-       />{" "}
-       Valuation
-     </p>
-     <p className="text-mainGray text-sm mb-5">
-       Prepared {formatDate(businessDetails?.updatedAt || "today")}
-     </p>
-   </div>
-   <div className="px-5 py-5 border border-gray-200 rounded-xl">
-     <p className="text-mainGreen font-medium mb-4">Valuation Summary</p>
+      <div className="mt-10 mb-10">
+  <div className="flex justify-between items-center">
+    <p className="font-semibold items-center flex gap-2">
+      <Image
+        src="/valuation.svg"
+        alt="Valuation"
+        width={20}
+        height={20}
+        className="object-cover"
+      />{" "}
+      Valuation & Deal Room Details
+    </p>
+    <button
+      className="border px-4 py-2 border-mainGreen text-mainGreen rounded text-xs hover:bg-green-50"
+      onClick={() => setIsEditDealRoomModalOpen(true)}
+      disabled={editingDealRoom}
+    >
+      {editingDealRoom ? "Updating..." : "Edit Deal Room Profile"}
+    </button>
+  </div>
+  <p className="text-mainGray text-sm mb-5">
+    Last updated: {dealRoomDetails?.updatedAt ? formatDate(dealRoomDetails.updatedAt) : "Not available"}
+  </p>
 
-     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-       <div>
-         <p className="text-gray-600 text-sm mb-1">Valuation Range</p>
-         <p className="font-medium text-xs">
-           {dealRoomDetails?.tentativeSellingPrice ? 
-             `₦ ${(dealRoomDetails.tentativeSellingPrice * 0.8).toLocaleString()} - ₦ ${(dealRoomDetails.tentativeSellingPrice * 1.2).toLocaleString()}` : 
-             "Not Available"}
-         </p>
-       </div>
+  {/* Main Valuation Details */}
+  <div className="px-5 py-5 border border-gray-200 rounded-xl mb-6">
+    <p className="text-mainGreen font-medium mb-4">Valuation Summary</p>
 
-       <div>
-         <p className="text-gray-600 text-sm mb-1">
-           Current Fundability Score
-         </p>
-         <p className="font-medium text-xs">{fundabilityDetails?.score || 0}%</p>
-       </div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div>
+        <p className="text-gray-600 text-sm mb-1">Valuation Range</p>
+        <p className="font-medium text-xs">
+          {dealRoomDetails?.tentativeSellingPrice ? 
+            `₦ ${(Number(dealRoomDetails.tentativeSellingPrice) * 0.8).toLocaleString()} - ₦ ${(Number(dealRoomDetails.tentativeSellingPrice) * 1.2).toLocaleString()}` : 
+            "Not Available"}
+        </p>
+      </div>
 
-       <div>
-         <p className="text-gray-600 text-sm mb-1">Investment potential</p>
-         <p className="font-medium text-xs">
-           {fundabilityDetails?.score && fundabilityDetails.score > 70 ? "High Growth Potential" : 
+      <div>
+        <p className="text-gray-600 text-sm mb-1">
+          Current Fundability Score
+        </p>
+        <p className="font-medium text-xs">{fundabilityDetails?.score || 0}%</p>
+      </div>
+
+      <div>
+        <p className="text-gray-600 text-sm mb-1">Investment potential</p>
+        <p className="font-medium text-xs">
+          {fundabilityDetails?.score && fundabilityDetails.score > 70 ? "High Growth Potential" : 
             fundabilityDetails?.score && fundabilityDetails.score > 50 ? "Moderate Growth Potential" : 
             "Low Growth Potential"}
-         </p>
-       </div>
-     </div>
+        </p>
+      </div>
+    </div>
 
-     <div className="border-t border-gray-200 pt-6">
-       <p className="text-mainGreen font-medium mb-4">
-         Key Valuation Metrics
-       </p>
+    <div className="border-t border-gray-200 pt-6">
+      <p className="text-mainGreen font-medium mb-4">
+        Key Valuation Metrics
+      </p>
 
-   
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-3">
-         <div>
-           <p className="text-gray-600 text-sm mb-1">Annual Revenue</p>
-           <p className="font-medium text-xs">
-             {dealRoomDetails?.reportedYearlySales ? 
-               `₦ ${dealRoomDetails.reportedYearlySales.toLocaleString()}` : 
-               fundabilityDetails?.averageAnnualRevenue ? 
-               `₦ ${fundabilityDetails.averageAnnualRevenue.toLocaleString()}` : 
-               "Not Available"}
-           </p>
-         </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-3">
+        <div>
+          <p className="text-gray-600 text-sm mb-1">Annual Revenue</p>
+          <p className="font-medium text-xs">
+            {dealRoomDetails?.reportedYearlySales ? 
+              `₦ ${Number(dealRoomDetails.reportedYearlySales).toLocaleString()}` : 
+              fundabilityDetails?.averageAnnualRevenue ? 
+              `₦ ${fundabilityDetails.averageAnnualRevenue.toLocaleString()}` : 
+              "Not Available"}
+          </p>
+        </div>
 
-         <div>
-           <p className="text-gray-600 text-sm mb-1">EBITDA</p>
-           <p className="font-medium text-xs">
-             {dealRoomDetails?.averageMonthlySales ? 
-               `₦ ${(dealRoomDetails.averageMonthlySales * 12 * (dealRoomDetails.profitMarginPercentage / 100)).toLocaleString()}` : 
-               "Not Available"}
-           </p>
-         </div>
+        <div>
+          <p className="text-gray-600 text-sm mb-1">EBITDA</p>
+          <p className="font-medium text-xs">
+            {dealRoomDetails?.averageMonthlySales ? 
+              `₦ ${(Number(dealRoomDetails.averageMonthlySales) * 12 * (dealRoomDetails.profitMarginPercentage / 100)).toLocaleString()}` : 
+              "Not Available"}
+          </p>
+        </div>
 
-         <div>
-           <p className="text-gray-600 text-sm mb-1">Net Profit Margin</p>
-           <p className="font-medium text-xs">
-             {dealRoomDetails?.profitMarginPercentage ? 
-               `${dealRoomDetails.profitMarginPercentage}%` : 
-               "Not Available"}
-           </p>
-         </div>
-       </div>
+        <div>
+          <p className="text-gray-600 text-sm mb-1">Net Profit Margin</p>
+          <p className="font-medium text-xs">
+            {dealRoomDetails?.profitMarginPercentage ? 
+              `${dealRoomDetails.profitMarginPercentage}%` : 
+              "Not Available"}
+          </p>
+        </div>
+      </div>
 
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         <div>
-           <p className="text-gray-600 text-sm mb-1">Growth Rate</p>
-           <p className="font-medium text-xs">
-             {fundabilityDetails?.revenueGrowthRate ? 
-               `${fundabilityDetails.revenueGrowthRate}%` : 
-               "Not Available"}
-           </p>
-         </div>
-       </div>
-     </div>
-   </div>
-   
-   {/* Proposals Sent Section */}
-   <div className="my-10">
-     <p className="font-semibold flex gap-1 items-center mb-5">
-       <Image
-         src="/business.svg"
-         alt="Proposals"
-         width={20}
-         height={20}
-         className="object-cover"
-       />{" "}
-       Proposals Sent
-     </p>
-     {renderProposalsTable()}
-   </div>
-   
-   {/* Proposals Received Section */}
-   <div className="my-10">
-     <p className="font-semibold flex gap-1 items-center mb-5">
-       <Image
-         src="/business.svg"
-         alt="Proposals"
-         width={20}
-         height={20}
-         className="object-cover"
-       />{" "}
-       Proposals Received
-     </p>
-     {renderProposalsReceivedTable()}
-   </div>
-   
-   {/* Edit Business Modal with fixed prop types */}
-   <EditBusinessModal
-     isOpen={isEditModalOpen}
-     onClose={() => setIsEditModalOpen(false)}
-     businessData={businessFormData}
-     businessId={businessId}
-     onUpdate={handleUpdate}
-   />
-   
-   <UpdateFundabilityScoreModal
-     isOpen={isEditFundabilityModalOpen}
-     onClose={() => setIsEditFundabilityModalOpen(false)}
-     currentScore={fundabilityDetails?.score || 0}
-     onUpdateScore={handleUpdateScore}
-   />
-   
-   <EditUserSuccessModal
-     title="Edit Business"
-     isOpen={isEditSuccessModalOpen}
-     text="Business information updated successfully."
-     onClose={() => setIsEditSuccessModalOpen(false)}
-   />
-   
-   <EditUserFailureModal
-     isOpen={isEditFailureModalOpen}
-     onClose={() => setIsEditFailureModalOpen(false)}
-     onRetry={handleRetryEdit}
-   />
-   
-   <UpdateScoreSuccessModal
-     isOpen={isSuccessModalOpen}
-     onClose={() => setIsSuccessModalOpen(false)}
-     newScore={updatedScore}
-     reason={updateReason}
-   />
-   
-   <SuspendUserFailureModal
-     isOpen={isSuspendFailureModalOpen}
-     onClose={() => setIsSuspendFailureModalOpen(false)}
-     onRetry={handleRetrySuspend}
-   />
-   
-   {/* Verify Business Modal */}
-   <VerifyBusinessModal
-     isOpen={isVerifyModalOpen}
-     onClose={() => setIsVerifyModalOpen(false)}
-     onConfirm={handleVerifyBusiness}
-     businessName={businessDetails?.businessName || "test"}
-     isVerifying={verifying}
-   />
-   
-   {/* Verify Success Modal */}
-   <VerifyBusinessSuccessModal
-     isOpen={isVerifySuccessModalOpen}
-     onClose={() => setIsVerifySuccessModalOpen(false)}
-     businessName={businessDetails?.businessName || "test"}
-   />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <p className="text-gray-600 text-sm mb-1">Growth Rate</p>
+          <p className="font-medium text-xs">
+            {fundabilityDetails?.revenueGrowthRate ? 
+              `${fundabilityDetails.revenueGrowthRate}%` : 
+              "Not Available"}
+          </p>
+        </div>
 
-   {/* Document Preview Modal */}
-   <DocumentPreviewModal 
-     isOpen={isPreviewOpen} 
-     onClose={closePreview} 
-     document={previewDoc} 
-   />
- </div>
-);
-}
+        <div>
+          <p className="text-gray-600 text-sm mb-1">Tentative Selling Price</p>
+          <p className="font-medium text-xs">
+            {dealRoomDetails?.tentativeSellingPrice ? 
+              `₦ ${Number(dealRoomDetails.tentativeSellingPrice).toLocaleString()}` : 
+              "Not Available"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-gray-600 text-sm mb-1">Average Monthly Sales</p>
+          <p className="font-medium text-xs">
+            {dealRoomDetails?.averageMonthlySales ? 
+              `₦ ${Number(dealRoomDetails.averageMonthlySales).toLocaleString()}` : 
+              "Not Available"}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {/* Additional Deal Room Details */}
+  <div className="px-5 py-5 border border-gray-200 rounded-xl">
+    <p className="text-mainGreen font-medium mb-4">Deal Room Details</p>
+
+    {/* Top Selling Products */}
+    <div className="mb-6">
+      <p className="text-gray-600 text-sm mb-2">Top Selling Products</p>
+      {dealRoomDetails?.topSellingProducts && dealRoomDetails.topSellingProducts.length > 0 ? (
+        <ul className="list-disc pl-5">
+          {dealRoomDetails.topSellingProducts.map((product, index) => (
+            <li key={index} className="text-sm mb-1">{product}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-gray-500">No top selling products listed</p>
+      )}
+    </div>
+
+    {/* Assets Details */}
+    <div className="mb-6">
+      <p className="text-gray-600 text-sm mb-2">Assets Details</p>
+      {dealRoomDetails?.assetsDetails && dealRoomDetails.assetsDetails.length > 0 ? (
+        <ul className="list-disc pl-5">
+          {dealRoomDetails.assetsDetails.map((asset, index) => (
+            <li key={index} className="text-sm mb-1">{asset}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-gray-500">No assets details listed</p>
+      )}
+      <div className="mt-2">
+        <p className="text-gray-600 text-sm">Value of Physical Assets:</p>
+        <p className="font-medium text-sm">
+          {dealRoomDetails?.valueOfPhysicalAssets ? 
+            `₦ ${Number(dealRoomDetails.valueOfPhysicalAssets).toLocaleString()}` : 
+            "Not Available"}
+        </p>
+      </div>
+    </div>
+
+    {/* Business Highlights */}
+    <div className="mb-6">
+      <p className="text-gray-600 text-sm mb-2">Business Highlights</p>
+      <p className="text-sm">
+        {dealRoomDetails?.highlightsOfBusiness || "No highlights available"}
+      </p>
+    </div>
+
+    {/* Facility Details */}
+    <div className="mb-6">
+      <p className="text-gray-600 text-sm mb-2">Facility Details</p>
+      <p className="text-sm">
+        {dealRoomDetails?.facilityDetails || "No facility details available"}
+      </p>
+    </div>
+
+    {/* Funding Details */}
+    <div className="mb-6">
+      <p className="text-gray-600 text-sm mb-2">Funding Details</p>
+      <p className="text-sm">
+        {dealRoomDetails?.fundingDetails || "No funding details available"}
+      </p>
+    </div>
+
+    {/* Reason for Sale */}
+    <div>
+      <p className="text-gray-600 text-sm mb-2">Reason for Sale</p>
+      <p className="text-sm">
+        {dealRoomDetails?.reasonForSale || "No reason for sale provided"}
+      </p>
+    </div>
+  </div>
+</div>
+    
+      
+      {/* Proposals Sent Section */}
+      <div className="my-10">
+        <p className="font-semibold flex gap-1 items-center mb-5">
+          <Image
+            src="/business.svg"
+            alt="Proposals"
+            width={20}
+            height={20}
+            className="object-cover"
+          />{" "}
+          Proposals Sent
+        </p>
+        {renderProposalsTable()}
+      </div>
+      
+      {/* Proposals Received Section */}
+      <div className="my-10">
+        <p className="font-semibold flex gap-1 items-center mb-5">
+          <Image
+            src="/business.svg"
+            alt="Proposals"
+            width={20}
+            height={20}
+            className="object-cover"
+          />{" "}
+          Proposals Received
+        </p>
+        {renderProposalsReceivedTable()}
+      </div>
+      
+      {/* Edit Business Modal with fixed prop types */}
+      <EditBusinessModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        businessData={businessFormData}
+        businessId={businessId}
+        onUpdate={handleUpdate}
+      />
+      
+      {/* Edit Deal Room Modal */}
+      <EditDealRoomModal
+        isOpen={isEditDealRoomModalOpen}
+        onClose={() => setIsEditDealRoomModalOpen(false)}
+        dealRoomData={dealRoomDetails}
+        businessId={businessId}
+        onUpdate={handleUpdateDealRoom}
+      />
+      
+      <UpdateFundabilityScoreModal
+        isOpen={isEditFundabilityModalOpen}
+        onClose={() => setIsEditFundabilityModalOpen(false)}
+        currentScore={fundabilityDetails?.score || 0}
+        onUpdateScore={handleUpdateScore}
+      />
+      
+      <EditUserSuccessModal
+        title="Edit Business"
+        isOpen={isEditSuccessModalOpen}
+        text="Business information updated successfully."
+        onClose={() => setIsEditSuccessModalOpen(false)}
+      />
+      
+      <EditUserFailureModal
+        isOpen={isEditFailureModalOpen}
+        onClose={() => setIsEditFailureModalOpen(false)}
+        onRetry={handleRetryEdit}
+      />
+      
+      <EditUserSuccessModal
+        title="Edit Deal Room Profile"
+        isOpen={isEditDealRoomSuccessModalOpen}
+        text="Deal room profile updated successfully."
+        onClose={() => setIsEditDealRoomSuccessModalOpen(false)}
+      />
+      
+      <EditUserFailureModal
+        isOpen={isEditDealRoomFailureModalOpen}
+        onClose={() => setIsEditDealRoomFailureModalOpen(false)}
+        onRetry={handleRetryEditDealRoom}
+      />
+      
+      <UpdateScoreSuccessModal
+        isOpen={isSuccessModalOpen}
+        onClose={() => setIsSuccessModalOpen(false)}
+        newScore={updatedScore}
+        reason={updateReason}
+      />
+      
+      <SuspendUserFailureModal
+        isOpen={isSuspendFailureModalOpen}
+        onClose={() => setIsSuspendFailureModalOpen(false)}
+        onRetry={handleRetrySuspend}
+      />
+      
+      {/* Business Suspension Modals */}
+      <SuspendBusinessModal
+        isOpen={isSuspendModalOpen}
+        onClose={() => setIsSuspendModalOpen(false)}
+        onSuspend={handleSuspendBusiness}
+        businessName={businessDetails?.businessName}
+      />
+      
+      <SuspendBusinessSuccessModal
+        isOpen={isSuspendSuccessModalOpen}
+        onClose={() => setIsSuspendSuccessModalOpen(false)}
+        businessName={businessDetails?.businessName}
+      />
+      
+      <SuspendBusinessFailureModal
+        isOpen={isSuspendFailureModalOpen}
+        onClose={() => setIsSuspendFailureModalOpen(false)}
+        onRetry={handleRetrySuspendBusiness}
+      />
+      
+      {/* Business Unsuspension Modals */}
+      <UnsuspendBusinessModal
+        isOpen={isUnsuspendModalOpen}
+        onClose={() => setIsUnsuspendModalOpen(false)}
+        onUnsuspend={handleUnsuspendBusiness}
+        businessName={businessDetails?.businessName}
+      />
+      
+      <UnsuspendBusinessSuccessModal
+        isOpen={isUnsuspendSuccessModalOpen}
+        onClose={() => setIsUnsuspendSuccessModalOpen(false)}
+        businessName={businessDetails?.businessName}
+      />
+      
+      <UnsuspendBusinessFailureModal
+        isOpen={isUnsuspendFailureModalOpen}
+        onClose={() => setIsUnsuspendFailureModalOpen(false)}
+        onRetry={handleRetryUnsuspendBusiness}
+      />
+      
+      {/* Verify Business Modal */}
+      <VerifyBusinessModal
+        isOpen={isVerifyModalOpen}
+        onClose={() => setIsVerifyModalOpen(false)}
+        onConfirm={handleVerifyBusiness}
+        businessName={businessDetails?.businessName || "test"}
+        isVerifying={verifying}
+      />
+      
+      {/* Verify Success Modal */}
+      <VerifyBusinessSuccessModal
+        isOpen={isVerifySuccessModalOpen}
+        onClose={() => setIsVerifySuccessModalOpen(false)}
+        businessName={businessDetails?.businessName || "test"}
+      />
+
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal 
+        isOpen={isPreviewOpen} 
+        onClose={closePreview} 
+        document={previewDoc} 
+      />
+    </div>
+  );
+};

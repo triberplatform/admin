@@ -184,6 +184,7 @@ export interface BusinessData {
   location: string;
   description: string;
   assets: string;
+  isSuspended:boolean;
   reportedSales: string;
   businessStage: BusinessStage;
   businessLegalEntity: BusinessLegalEntity;
@@ -357,26 +358,26 @@ export interface FundabilityDocs {
 
 // Deal Room Details
 export interface DealRoomDetail {
-  id: number;
-  publicId: string;
-  businessId: string;
+  id?: number;
+  publicId?: string;
+  businessId?: string;
   topSellingProducts: string[];
   highlightsOfBusiness: string;
   facilityDetails: string;
   fundingDetails: string;
-  averageMonthlySales: number;
-  reportedYearlySales: number;
+  averageMonthlySales: string;
+  reportedYearlySales: string;
   profitMarginPercentage: number;
   assetsDetails: string[];
-  valueOfPhysicalAssets: number;
-  tentativeSellingPrice: number;
+  valueOfPhysicalAssets: string;
+  tentativeSellingPrice: string;
   reasonForSale: string;
-  businessPhotos: string[];
-  proofOfBusiness: string;
-  businessDocuments: string[];
-  createdAt: string;
-  updatedAt: string;
-  proposalDetails: any[]; // This could be further defined if you have the structure
+  businessPhotos?: string[];
+  proofOfBusiness?: string;
+  businessDocuments?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+  proposalDetails?: any[]; // This could be further defined if you have the structure
 }
 
 export interface dashboardData{
