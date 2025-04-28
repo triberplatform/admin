@@ -1,6 +1,6 @@
 import React, { useState, ChangeEvent, FormEvent, useEffect } from "react";
 import Modal from "../Modal";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Plus, X } from "lucide-react";
 import { useBusinessStore } from "@/app/store/useBusinessStore";
 import { EditBusinessDealRoomRPayload } from "@/app/types/payload";
 
@@ -74,31 +74,29 @@ const EditDealRoomModal: React.FC<EditDealRoomModalProps> = ({
   const [error, setError] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
   
-  // Temporary state for string inputs that need to be converted to arrays
-  const [topSellingProductsStr, setTopSellingProductsStr] = useState<string>("");
-  const [assetsDetailsStr, setAssetsDetailsStr] = useState<string>("");
+  // Individual inputs for array items
+  const [newProduct, setNewProduct] = useState<string>("");
+  const [newAsset, setNewAsset] = useState<string>("");
 
   // Update form data when dealRoomData changes (e.g., when modal is opened with different business)
   useEffect(() => {
     if (dealRoomData) {
       setFormData({
         ...dealRoomData,
+        // Ensure arrays are properly initialized
+        topSellingProducts: dealRoomData.topSellingProducts || [],
+        assetsDetails: dealRoomData.assetsDetails || []
       });
-      
-      // Initialize string representations for array fields
-      setTopSellingProductsStr(dealRoomData.topSellingProducts?.join(', ') || '');
-      setAssetsDetailsStr(dealRoomData.assetsDetails?.join(', ') || '');
     }
   }, [dealRoomData]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
-    // Handle special cases for array inputs
-    if (name === 'topSellingProductsStr') {
-      setTopSellingProductsStr(value);
-    } else if (name === 'assetsDetailsStr') {
-      setAssetsDetailsStr(value);
+    if (name === 'newProduct') {
+      setNewProduct(value);
+    } else if (name === 'newAsset') {
+      setNewAsset(value);
     } else if (name === 'profitMarginPercentage') {
       // Handle numeric input with validation
       const numberValue = parseFloat(value);
@@ -111,53 +109,81 @@ const EditDealRoomModal: React.FC<EditDealRoomModalProps> = ({
     }
   };
 
+  // Add a new product to the list
+  const addProduct = () => {
+    if (newProduct.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        topSellingProducts: [...prev.topSellingProducts, newProduct.trim()]
+      }));
+      setNewProduct("");
+    }
+  };
+
+  // Remove a product from the list
+  const removeProduct = (indexToRemove: number) => {
+    setFormData(prev => ({
+      ...prev,
+      topSellingProducts: prev.topSellingProducts.filter((_, index) => index !== indexToRemove)
+    }));
+  };
+
+  // Add a new asset to the list
+  const addAsset = () => {
+    if (newAsset.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        assetsDetails: [...prev.assetsDetails, newAsset.trim()]
+      }));
+      setNewAsset("");
+    }
+  };
+
+  // Remove an asset from the list
+  const removeAsset = (indexToRemove: number) => {
+    setFormData(prev => ({
+      ...prev,
+      assetsDetails: prev.assetsDetails.filter((_, index) => index !== indexToRemove)
+    }));
+  };
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(false);
     setErrorMessage("");
     
     try {
-      // Process string inputs into arrays
-      const topSellingProducts = topSellingProductsStr
-        .split(',')
-        .map(item => item.trim())
-        .filter(item => item !== '');
-        
-      const assetsDetails = assetsDetailsStr
-        .split(',')
-        .map(item => item.trim())
-        .filter(item => item !== '');
-      
-      // Log for debugging
-      console.log("Preparing to send arrays:", {
-        topSellingProducts,
-        assetsDetails
-      });
-      
-      // Prepare the payload with the correct format for API
-      // Making sure to stringify the arrays
+      // Prepare the payload with stringified array fields
       const payload: EditBusinessDealRoomRPayload = {
-        topSellingProducts: JSON.stringify(topSellingProducts) as any, // Using type assertion to satisfy TypeScript
+        // Stringify the arrays for the API
+        topSellingProducts: JSON.stringify(formData.topSellingProducts) as any,
         highlightsOfBusiness: formData.highlightsOfBusiness,
         facilityDetails: formData.facilityDetails,
         fundingDetails: formData.fundingDetails,
         averageMonthlySales: formData.averageMonthlySales,
         reportedYearlySales: formData.reportedYearlySales,
         profitMarginPercentage: Number(formData.profitMarginPercentage),
-        assetsDetails: JSON.stringify(assetsDetails) as any, // Using type assertion to satisfy TypeScript
+        assetsDetails: JSON.stringify(formData.assetsDetails) as any,
         valueOfPhysicalAssets: formData.valueOfPhysicalAssets,
         tentativeSellingPrice: formData.tentativeSellingPrice,
         reasonForSale: formData.reasonForSale
       };
       
-      // Log the final payload for debugging
-      console.log("Sending payload with stringified arrays:", payload);
+      // Log the payload for debugging
+      console.log("Sending deal room update payload with stringified arrays:", payload);
       
       // Call the onUpdate function with the form data
       await onUpdate(payload);
     } catch (err: any) {
       setError(true);
       setErrorMessage(err.message || "An error occurred while updating deal room details.");
+    }
+  };
+
+  // Add keyboard event handler for adding items with Enter key
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, addFunction: () => void) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addFunction();
     }
   };
 
@@ -172,17 +198,49 @@ const EditDealRoomModal: React.FC<EditDealRoomModalProps> = ({
       
       <form onSubmit={handleSubmit} className="max-h-[70vh] overflow-y-auto pr-2">
         <div className="space-y-4">
+          {/* Top Selling Products - as individual items */}
           <div>
             <label className="block text-sm font-medium mb-1">Top Selling Products</label>
-            <textarea
-              name="topSellingProductsStr"
-              value={topSellingProductsStr}
-              onChange={handleChange}
-              className="w-full border rounded-md px-3 py-2 border-gray-300 focus:outline-none text-sm focus:ring-2 focus:ring-green-500"
-              placeholder="Product A, Product B, Product C"
-              rows={2}
-            />
-            <p className="text-xs text-gray-500 mt-1">Enter products separated by commas</p>
+            
+            <div className="mb-2">
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  name="newProduct"
+                  value={newProduct}
+                  onChange={handleChange}
+                  onKeyDown={(e) => handleKeyDown(e, addProduct)}
+                  className="flex-1 border rounded-md px-3 py-2 border-gray-300 focus:outline-none text-sm focus:ring-2 focus:ring-green-500"
+                  placeholder="Add a product"
+                />
+                <button
+                  type="button"
+                  onClick={addProduct}
+                  className="px-3 py-2 bg-mainGreen text-white rounded-md hover:bg-green-600"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+            
+            {/* List of added products */}
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {formData.topSellingProducts.map((product, index) => (
+                <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                  <span className="text-sm">{product}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeProduct(index)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+              {formData.topSellingProducts.length === 0 && (
+                <p className="text-xs text-gray-500">No products added yet</p>
+              )}
+            </div>
           </div>
           
           <div>
@@ -259,17 +317,49 @@ const EditDealRoomModal: React.FC<EditDealRoomModalProps> = ({
             />
           </div>
           
+          {/* Assets Details - as individual items */}
           <div>
             <label className="block text-sm font-medium mb-1">Assets Details</label>
-            <textarea
-              name="assetsDetailsStr"
-              value={assetsDetailsStr}
-              onChange={handleChange}
-              className="w-full border rounded-md px-3 py-2 border-gray-300 focus:outline-none text-sm focus:ring-2 focus:ring-green-500"
-              placeholder="Asset A, Asset B, Asset C"
-              rows={2}
-            />
-            <p className="text-xs text-gray-500 mt-1">Enter assets separated by commas</p>
+            
+            <div className="mb-2">
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  name="newAsset"
+                  value={newAsset}
+                  onChange={handleChange}
+                  onKeyDown={(e) => handleKeyDown(e, addAsset)}
+                  className="flex-1 border rounded-md px-3 py-2 border-gray-300 focus:outline-none text-sm focus:ring-2 focus:ring-green-500"
+                  placeholder="Add an asset"
+                />
+                <button
+                  type="button"
+                  onClick={addAsset}
+                  className="px-3 py-2 bg-mainGreen text-white rounded-md hover:bg-green-600"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+            
+            {/* List of added assets */}
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {formData.assetsDetails.map((asset, index) => (
+                <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                  <span className="text-sm">{asset}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAsset(index)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+              {formData.assetsDetails.length === 0 && (
+                <p className="text-xs text-gray-500">No assets added yet</p>
+              )}
+            </div>
           </div>
           
           <div>
